@@ -25,7 +25,7 @@ AGENT_DIR = pathlib.Path(__file__).resolve().parent.parent
 if str(AGENT_DIR) not in sys.path:
     sys.path.insert(0, str(AGENT_DIR))
 
-from agent_core.config import CONFIG  # noqa: E402
+from agent_core.config import CONFIG, STATE_FOLDERS  # noqa: E402
 
 
 def run_git(args: list[str], cwd: pathlib.Path) -> subprocess.CompletedProcess:
@@ -62,6 +62,12 @@ def agent_env(tmp_path, monkeypatch):
     monkeypatch.setenv("BETA_REPO_PATH", str(repo_dir / "tools-beta"))
     monkeypatch.setenv("AGENT_WORKTREE_ROOT", str(repo_dir / "worktrees"))
     monkeypatch.setenv("BASE_BRANCH", "main")
+
+    # 実行環境（setxで永続設定された実マシンのAGENT_STATE_DIR等）が
+    # AGENT_ROOTの導出を上書きしてテスト隔離を壊すのを防ぐため、明示的に消す。
+    for override_key in STATE_FOLDERS.values():
+        monkeypatch.delenv(override_key, raising=False)
+    monkeypatch.delenv("AGENT_DONE_DIR", raising=False)
 
     CONFIG.__init__()  # 同じインスタンスの属性を、新しい環境変数で再構築する
 
