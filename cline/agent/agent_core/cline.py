@@ -40,7 +40,9 @@ def launch_vscode(worktree: pathlib.Path, logger=None) -> bool:
         return False
 
     subprocess.Popen(
-        [executable, "--new-window", str(worktree)],
+        # worktreeは毎回新規フォルダなので、信頼確認ダイアログが
+        # Clineの入力欄を塞いで自動投入が失敗するのを防ぐ。
+        [executable, "--new-window", "--disable-workspace-trust", str(worktree)],
         shell=True,
     )
 
