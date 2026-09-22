@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>4. 運用 - AIエージェント基盤ドキュメント</title>
+<style>
+:root {
+  --bg: #F5F4F0; --surface: #FFFFFF; --border: #D3D1C7;
+  --text: #2C2C2A; --text-secondary: #5F5E5A; --text-muted: #888780;
+  --accent: #0C447C; --accent-bg: #E6F1FB;
+  --code-bg: #F1EFE8;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font-family: -apple-system, "Segoe UI", "Hiragino Sans", "Noto Sans JP", Meiryo, sans-serif;
+  line-height: 1.75; font-size: 15px;
+}
+.layout { display: flex; min-height: 100vh; }
+nav {
+  width: 220px; flex-shrink: 0; background: var(--surface);
+  border-right: 0.5px solid var(--border); padding: 24px 16px;
+  position: sticky; top: 0; height: 100vh; overflow-y: auto;
+}
+nav .brand { font-size: 13px; font-weight: 500; color: var(--text-secondary); margin: 0 8px 16px; }
+nav a {
+  display: block; padding: 8px; border-radius: 8px; color: var(--text);
+  text-decoration: none; font-size: 14px; margin-bottom: 2px;
+}
+nav a:hover { background: var(--code-bg); }
+nav a.active { background: var(--accent-bg); color: var(--accent); font-weight: 500; }
+main { flex: 1; min-width: 0; padding: 40px 48px; max-width: 900px; }
+h1, h2, h3 { font-weight: 500; line-height: 1.4; }
+h1 { font-size: 26px; margin: 0 0 20px; }
+h2 { font-size: 20px; margin: 40px 0 16px; padding-top: 8px; border-top: 0.5px solid var(--border); }
+h3 { font-size: 17px; margin: 28px 0 12px; }
+p { margin: 0 0 14px; }
+a { color: var(--accent); }
+img { max-width: 100%; height: auto; }
+table { border-collapse: collapse; width: 100%; margin: 0 0 20px; font-size: 14px; }
+th, td { border: 0.5px solid var(--border); padding: 8px 12px; text-align: left; vertical-align: top; }
+th { background: var(--code-bg); font-weight: 500; }
+code { background: var(--code-bg); border-radius: 4px; padding: 1px 6px; font-size: 13px;
+  font-family: "Consolas", "SF Mono", monospace; }
+pre { background: var(--code-bg); border-radius: 8px; padding: 16px; overflow-x: auto;
+  font-size: 13px; line-height: 1.6; }
+pre code { background: none; padding: 0; }
+blockquote { border-left: 3px solid var(--border); margin: 0 0 14px; padding: 4px 16px;
+  color: var(--text-secondary); }
+ul, ol { padding-left: 24px; margin: 0 0 14px; }
+li { margin-bottom: 4px; }
+hr { border: none; border-top: 0.5px solid var(--border); margin: 32px 0; }
+p[align="center"] { text-align: center; margin: 24px 0; }
+</style>
+</head>
+<body>
+<div class="layout">
+<nav><p class="brand">AIエージェント基盤</p><a href="index.html">概要</a><a href="01_architecture.html">1. アーキテクチャ</a><a href="02_setup.html">2. 導入手順</a><a href="03_power_automate.html">3. Power Automate</a><a href="04_operations.html" class="active">4. 運用</a><a href="05_verification.html">5. 動作確認</a></nav>
+<main>
+<h1 id="04-運用とトラブルシュート">04. 運用とトラブルシュート</h1>
+<h2 id="1-日常の操作">1. 日常の操作</h2>
+<pre><code class="language-powershell"># 起動 / 停止
+powershell -ExecutionPolicy Bypass -File .\scripts\start_all.ps1 -Parallel 3
+powershell -ExecutionPolicy Bypass -File .\scripts\stop_all.ps1
+
+# 状態確認
+python agent\agent_cli.py status
+python agent\agent_cli.py status --status waiting_approval
+python agent\agent_cli.py show 12
+
+# 手動操作
+python agent\agent_cli.py retry 12       # failed / rejected を着手待ちへ戻す
+python agent\agent_cli.py approve 12     # Teamsを使わず承認
+python agent\agent_cli.py reject 12      # 却下（Issueはopenのままneeds-reworkを付与）
+python agent\agent_cli.py unlock         # 残存ロックの掃除
+python agent\agent_cli.py clean-worktrees --remove-completed
+</code></pre>
+<p>ログは <code>AGENT_ROOT\logs\</code> にあります。</p>
+<table>
+<thead>
+<tr>
+<th>ファイル</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>issue-&lt;N&gt;.log</code></td>
+<td>Issue単位の全ログ（実装・マージ）</td>
+</tr>
+<tr>
+<td><code>orchestrator.log</code></td>
+<td>割り当ての記録</td>
+</tr>
+<tr>
+<td><code>issue_agent.log</code></td>
+<td>Issue作成の記録</td>
+</tr>
+<tr>
+<td><code>approval_agent.log</code></td>
+<td>承認結果の処理</td>
+</tr>
+</tbody>
+</table>
+<h2 id="2-並走数の考え方">2. 並走数の考え方</h2>
+<p><code>AGENT_MAX_PARALLEL</code> は「同時に実装ワーカーを走らせる数」です。</p>
+<table>
+<thead>
+<tr>
+<th>値</th>
+<th>向く状況</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>まず動かして確認したいとき。従来の逐次実行と同じ</td>
+</tr>
+<tr>
+<td>2〜3</td>
+<td>通常運用。GUI待ちが気にならない範囲</td>
+</tr>
+<tr>
+<td>4以上</td>
+<td><code>--manual</code> 運用や、Clineを複数ウィンドウで人が捌ける場合</td>
+</tr>
+</tbody>
+</table>
+<p>ボトルネックは<strong>Clineへの貼り付け（GUIロック）</strong>ではなく、
+実際には<strong>Clineの実装時間</strong>と<strong>人の回答/承認待ち</strong>です。
+回答待ちのIssueはGUIを占有しないので、並走の効果はそこで出ます。</p>
+<p>VS Codeウィンドウが増えて操作しづらい場合は、
+<code>--no-vscode</code> で起動し、必要なときだけ人がworktreeを開く運用もできます。</p>
+<h2 id="3-よくあるトラブル">3. よくあるトラブル</h2>
+<h3 id="issueが二重に作られる">Issueが二重に作られる</h3>
+<ul>
+<li>①のTeams投稿JSONに <code>id</code>（Message ID）が入っているか確認する</li>
+<li>依頼チャネルと通知チャネルが同じになっていないか確認する</li>
+<li><code>state/processed/</code> にマーカーが残っているか確認する</li>
+</ul>
+<h3 id="承認しても何も起きない">承認しても何も起きない</h3>
+<ol>
+<li>③フローの出力先が <code>/work/agent/approval-test</code> になっていないか
+   （<code>docs/03_power_automate.md</code> 5-1 を参照）</li>
+<li><code>approval_agent.py</code> が起動しているか</li>
+<li><code>approval/</code> にJSONが残っていないか（残っていれば手動で1回動かす）</li>
+</ol>
+<pre><code class="language-powershell">python agent\approval_agent.py --once
+</code></pre>
+<h3 id="teams通知が何度も届く">Teams通知が何度も届く</h3>
+<p>④フローに「ファイルの移動」アクションが入っていません。
+<code>reply/done</code> への移動を追加してください。</p>
+<h3 id="clineにプロンプトが入らない">Clineにプロンプトが入らない</h3>
+<pre><code class="language-powershell">python agent\agent_cli.py test-click
+</code></pre>
+<ul>
+<li>Windowsの表示スケールを100%にする</li>
+<li>VS Codeを最大化する</li>
+<li>それでも安定しない場合は <code>AGENT_GUI_MODE=manual</code> にする</li>
+</ul>
+<h3 id="worktreeの作成に失敗する">worktreeの作成に失敗する</h3>
+<pre><code class="language-powershell">git -C C:\repo\tools worktree list
+git -C C:\repo\tools worktree prune
+python agent\agent_cli.py clean-worktrees --remove-completed
+</code></pre>
+<p>同じブランチが2つのworktreeでチェックアウトされているとエラーになります。
+<code>worktree list</code> で重複を確認してください。</p>
+<h3 id="既に起動していますと出るが起動していない">「既に起動しています」と出るが起動していない</h3>
+<p>プロセスが強制終了されロックが残っています。</p>
+<pre><code class="language-powershell">python agent\agent_cli.py unlock
+</code></pre>
+<p>PIDが生きている場合はスキップされます。強制削除は <code>--force</code> です。</p>
+<h3 id="マージが-blocked-で止まる">マージが <code>BLOCKED</code> で止まる</h3>
+<ul>
+<li>ブランチ保護でレビュー必須になっていないか</li>
+<li>必須チェック（Actions）が落ちていないか</li>
+</ul>
+<p>保護を残したままにする場合は、エージェント用に
+「Allow specified actors to bypass required pull requests」を設定するか、
+承認後に人がマージする運用（<code>finish_agent.py</code> のマージ処理を無効化）にします。</p>
+<h3 id="文字化けでマージが止まった">文字化けでマージが止まった</h3>
+<p><code>finish_agent.py</code> は変更ファイルのUTF-8検査を行い、
+文字化けを検出するとマージを中止して <code>failed</code> にします。</p>
+<pre><code class="language-powershell"># 該当ファイルをUTF-8 BOMなしで保存し直してから
+python agent\agent_cli.py approve 12
+</code></pre>
+<p>Cline側の再発防止としては、プロンプトの
+「ファイルはUTF-8 BOMなしで保存してください」を守らせることと、
+VS Codeの <code>files.encoding</code> を <code>utf8</code> にしておくことです。</p>
+<h2 id="4-障害時の復旧">4. 障害時の復旧</h2>
+<p>プロセスが落ちても、<code>state/issue-&lt;N&gt;.json</code> に状態が残っています。</p>
+<table>
+<thead>
+<tr>
+<th>状態</th>
+<th>復旧方法</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>queued</code> / <code>implementing</code> のまま止まった</td>
+<td><code>agent_cli.py retry &lt;N&gt;</code> で <code>created</code> へ戻す</td>
+</tr>
+<tr>
+<td><code>waiting_decision</code> のまま</td>
+<td><code>decision/issue-&lt;N&gt;.json</code> を手で置く</td>
+</tr>
+<tr>
+<td><code>waiting_approval</code> のまま</td>
+<td>Teamsカードを押す、または <code>agent_cli.py approve &lt;N&gt;</code></td>
+</tr>
+<tr>
+<td><code>approved</code> のまま</td>
+<td><code>python agent\finish_agent.py &lt;N&gt; --approve</code> を再実行</td>
+</tr>
+<tr>
+<td><code>failed</code></td>
+<td>ログを見て原因を直し <code>retry</code></td>
+</tr>
+<tr>
+<td><code>rejected</code>（GitHub Issueはopenのまま）</td>
+<td>内容を見直したうえで <code>retry &lt;N&gt;</code>。<code>state/done/</code> へ退避済みのstateを自動で復元してから <code>created</code> に戻す</td>
+</tr>
+</tbody>
+</table>
+<p><code>retry</code> は <code>created</code> に戻すだけなので、worktreeと既存コミットは残ります。
+まっさらからやり直したい場合は先にworktreeを消してください。
+（<code>rejected</code> の場合は却下時に変更とブランチが既に破棄されているため、
+worktreeは通常きれいな状態から再開します。）</p>
+<pre><code class="language-powershell">git -C C:\repo\tools worktree remove --force C:\repo\worktrees\issue-12
+git -C C:\repo\tools branch -D feature/issue-12-xxx
+python agent\agent_cli.py retry 12
+</code></pre>
+<h2 id="5-既存スクリプトからの移行">5. 既存スクリプトからの移行</h2>
+<table>
+<thead>
+<tr>
+<th>旧</th>
+<th>新</th>
+<th>備考</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>issue_agent.py</code></td>
+<td><code>agent/issue_agent.py</code></td>
+<td>環境変数が <code>AGENT_ROOT</code> 集約に変更</td>
+</tr>
+<tr>
+<td><code>run_agent_daemon.py</code></td>
+<td><code>agent/orchestrator.py</code></td>
+<td>逐次 → 並走</td>
+</tr>
+<tr>
+<td><code>run_agent.py</code></td>
+<td><code>agent/implement_agent.py</code></td>
+<td>worktree対応、PR作成まで担当</td>
+</tr>
+<tr>
+<td><code>approval_agent.py</code></td>
+<td><code>agent/approval_agent.py</code></td>
+<td>watchdog監視、done退避、rework対応</td>
+</tr>
+<tr>
+<td><code>finish_agent.py</code></td>
+<td><code>agent/finish_agent.py</code></td>
+<td>commit/pushは実装側へ移動、マージ担当に専念</td>
+</tr>
+<tr>
+<td>（なし）</td>
+<td><code>agent/deploy_preview.py</code></td>
+<td>tools-betaへの公開</td>
+</tr>
+<tr>
+<td>（なし）</td>
+<td><code>agent/agent_cli.py</code></td>
+<td>運用コマンド</td>
+</tr>
+</tbody>
+</table>
+<h3 id="主な違い">主な違い</h3>
+<ol>
+<li>
+<p><strong>コミットのタイミング</strong>
+   旧: 承認後に <code>finish_agent</code> がコミット
+   新: 実装完了時点でコミット＆push＆ドラフトPR作成
+   → 承認前にGitHub上で差分レビューできます。</p>
+</li>
+<li>
+<p><strong>マージ</strong>
+   旧: PR作成まで（マージは人）
+   新: 承認で <code>squash merge</code> → <code>Closes #N</code> でIssue自動クローズ</p>
+</li>
+<li>
+<p><strong>作業ディレクトリ</strong>
+   旧: <code>TARGET_REPO_PATH</code> を直接 checkout（並走不可）
+   新: <code>worktrees/issue-&lt;N&gt;</code>（並走可）</p>
+</li>
+<li>
+<p><strong>環境変数</strong>
+   旧: <code>AGENT_REQUEST_DIR</code> などを個別に設定
+   新: <code>AGENT_ROOT</code> だけで全フォルダを導出（個別上書きも可）</p>
+</li>
+</ol>
+<h3 id="移行手順">移行手順</h3>
+<ol>
+<li>旧デーモンをすべて停止する</li>
+<li>進行中のIssueを片付ける（承認済みならマージまで終わらせる）</li>
+<li><code>scripts\setup.ps1</code> を実行する</li>
+<li>旧 <code>state/</code> のJSONは <code>status</code> の値が概ね互換なのでそのまま使えます
+   （<code>implementation_started</code> → <code>implementing</code> へ手で直すか、<code>retry</code> で戻す）</li>
+<li>Power Automate ③ の出力先を <code>/work/agent/approval</code> へ修正する</li>
+<li>Power Automate ④ をインポートする</li>
+<li><code>start_all.ps1</code> で起動する</li>
+</ol>
+<h2 id="6-拡張のヒント">6. 拡張のヒント</h2>
+<table>
+<thead>
+<tr>
+<th>やりたいこと</th>
+<th>方法</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Issueにラベルを付けて分類</td>
+<td><code>ghcli.create_issue(title, body, labels=[...])</code></td>
+</tr>
+<tr>
+<td>特定ラベルだけ自動実装</td>
+<td><code>orchestrator.dispatchable_issues()</code> に条件を追加</td>
+</tr>
+<tr>
+<td>CIの結果を承認カードに出す</td>
+<td><code>implement_agent.write_waiting()</code> に <code>gh pr checks</code> の結果を追加</td>
+</tr>
+<tr>
+<td>夜間だけ動かす</td>
+<td><code>orchestrator.py</code> を Windows タスクスケジューラで起動/停止</td>
+</tr>
+<tr>
+<td>Cline以外のコーディングAI</td>
+<td><code>agent_core/cline.py</code> を差し替える（インターフェースは <code>inject_prompt</code> のみ）</td>
+</tr>
+<tr>
+<td>承認者を限定する</td>
+<td>Power Automate ③ のカードを承認者へのメンション付きにし、<code>data</code> に承認者名を含める</td>
+</tr>
+</tbody>
+</table>
+<h2 id="7-自動テスト">7. 自動テスト</h2>
+<pre><code class="language-powershell">cd agent
+pip install -r requirements-dev.txt
+pytest
+</code></pre>
+<p><code>agent/tests/</code> に133件の回帰テストがあります。OneDrive・GitHub・Teamsの
+実物には触れず、隔離された一時ディレクトリとローカルのgitリポジトリだけで
+完結するため、<code>gh</code> 未導入の開発機でもそのまま実行できます
+（<code>gh</code> を実際に呼ぶ範囲— Issue作成・PR操作・マージ — はテスト対象外です）。</p>
+<p>コードを変更したときは、次の観点でテストを見直してください。</p>
+<table>
+<thead>
+<tr>
+<th>変更する箇所</th>
+<th>関連するテストファイル</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>agent_core/jsonio.py</code></td>
+<td><code>test_jsonio.py</code></td>
+</tr>
+<tr>
+<td><code>agent_core/locks.py</code></td>
+<td><code>test_locks.py</code>（特にホスト跨ぎの回収防止）</td>
+</tr>
+<tr>
+<td><code>agent_core/statefile.py</code></td>
+<td><code>test_statefile.py</code></td>
+</tr>
+<tr>
+<td><code>agent_core/gitops.py</code></td>
+<td><code>test_gitops.py</code>（実gitリポジトリを使用）</td>
+</tr>
+<tr>
+<td><code>agent_core/cline.py</code></td>
+<td><code>test_cline.py</code>（ウィンドウ特定の正規表現）</td>
+</tr>
+<tr>
+<td><code>agent_core/checks.py</code></td>
+<td><code>test_checks.py</code></td>
+</tr>
+<tr>
+<td><code>agent_core/prompt.py</code></td>
+<td><code>test_prompt.py</code></td>
+</tr>
+<tr>
+<td><code>deploy_preview.py</code></td>
+<td><code>test_deploy_preview.py</code></td>
+</tr>
+<tr>
+<td><code>issue_agent.py</code></td>
+<td><code>test_issue_agent.py</code></td>
+</tr>
+<tr>
+<td><code>approval_agent.py</code></td>
+<td><code>test_approval_agent.py</code></td>
+</tr>
+<tr>
+<td><code>implement_agent.py</code></td>
+<td><code>test_implement_agent.py</code>（questionId照合、完了フォールバック）</td>
+</tr>
+<tr>
+<td><code>finish_agent.py</code></td>
+<td><code>test_finish_agent.py</code>（静的チェック、却下フロー）</td>
+</tr>
+</tbody>
+</table>
+<p>新しい振る舞いを追加したときは、まずテストを書いてから実装すると、
+<code>agent_cli.py doctor</code> では拾えない細かい条件分岐の崩れに気づきやすくなります。</p>
+</main>
+</div>
+</body>
+</html>

@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="1364" viewBox="0 0 640 1364" role="img">
+<title>Teamsに投稿される3種類のカードのモックアップ</title>
+<desc>Issue作成通知、Clineからの質問カード、実装完了の承認カード（未展開と実装内容を展開した状態）を時系列に並べたモックアップ。実際のAdaptive Cardのレイアウトを簡略化したもの。</desc>
+<defs>
+  <marker id="click-arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M1 1 L8 5 L1 9" fill="none" stroke="#0C447C" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  </marker>
+</defs>
+<rect x="0" y="0" width="640" height="1364" fill="#F5F4F0" rx="12"/>
+<rect x="20" y="20" width="600" height="150" rx="12" fill="#FFFFFF" stroke="#D3D1C7" stroke-width="0.5"/>
+<rect x="36" y="40" width="28" height="28" rx="6" fill="#E6F1FB"/>
+<text x="50" y="58" fill="#0C447C" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="11" font-weight="500" text-anchor="middle">AI</text>
+<text x="74" y="53" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="13" font-weight="500" text-anchor="start">AIエージェント bot</text>
+<text x="74" y="69" fill="#888780" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="11" font-weight="400" text-anchor="start">火曜 14:02</text>
+<text x="36" y="90" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="14" font-weight="500" text-anchor="start">Issue #12 を作成しました</text>
+<text x="36" y="111" fill="#5F5E5A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="13" font-weight="400" text-anchor="start">タイトル: 顧客一覧ページを追加</text>
+<text x="36" y="130" fill="#5F5E5A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="13" font-weight="400" text-anchor="start">順番が来次第、自動で実装を開始します。</text>
+<text x="36" y="154" fill="#0C447C" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="13" font-weight="400" text-anchor="start">Issueを開く ↗</text>
+<line x1="36" y1="157" x2="116.6" y2="157" stroke="#0C447C" stroke-width="0.6"/>
+<rect x="20" y="190" width="600" height="352" rx="12" fill="#FFFFFF" stroke="#D3D1C7" stroke-width="0.5"/>
+<rect x="36" y="210" width="28" height="28" rx="6" fill="#E6F1FB"/>
+<text x="50" y="228" fill="#0C447C" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="11" font-weight="500" text-anchor="middle">AI</text>
+<text x="74" y="223" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="13" font-weight="500" text-anchor="start">AIエージェント bot</text>
+<text x="74" y="239" fill="#888780" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="11" font-weight="400" text-anchor="start">火曜 14:11</text>
+<text x="36" y="260" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="14" font-weight="500" text-anchor="start">Issue #12 顧客一覧ページを追加</text>
+<text x="36" y="281" fill="#5F5E5A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="13" font-weight="400" text-anchor="start">顧客データの取得元をどうしますか。</text>
+<rect x="36" y="298" width="568" height="40" rx="8" fill="#FFFFFF" stroke="#D3D1C7" stroke-width="0.6"/>
+<circle cx="52" cy="318.0" r="7" fill="none" stroke="#888780" stroke-width="1.2"/>
+<circle cx="52" cy="318.0" r="3.5" fill="#0C447C"/>
+<text x="68" y="315" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500" text-anchor="start">customer.json から読む</text>
+<text x="68" y="330" fill="#5F5E5A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="11" font-weight="400" text-anchor="start">既存の静的ファイルを流用する</text>
+<rect x="36" y="346" width="568" height="40" rx="8" fill="#FFFFFF" stroke="#D3D1C7" stroke-width="0.6"/>
+<circle cx="52" cy="366.0" r="7" fill="none" stroke="#888780" stroke-width="1.2"/>
+<text x="68" y="363" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500" text-anchor="start">既存APIを流用する</text>
+<text x="68" y="378" fill="#5F5E5A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="11" font-weight="400" text-anchor="start">社内APIから都度取得する</text>
+<rect x="36" y="394" width="568" height="40" rx="8" fill="#FFFFFF" stroke="#D3D1C7" stroke-width="0.6"/>
+<circle cx="52" cy="414.0" r="7" fill="none" stroke="#888780" stroke-width="1.2"/>
+<text x="68" y="418.0" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500" text-anchor="start">その他（下に入力）</text>
+<rect x="36" y="446" width="568" height="34" rx="8" fill="#FFFFFF" stroke="#D3D1C7" stroke-width="0.6"/>
+<text x="48" y="467" fill="#888780" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="400" text-anchor="start">カスタム回答を入力（任意）</text>
+<rect x="36" y="492" width="120" height="34" rx="8" fill="#2C2C2A" stroke="#2C2C2A" stroke-width="0.8"/>
+<text x="96.0" y="513.0" fill="#FFFFFF" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="13" font-weight="500" text-anchor="middle">回答を送信</text>
+<rect x="20" y="594" width="600" height="318" rx="12" fill="#FFFFFF" stroke="#D3D1C7" stroke-width="0.5"/>
+<text x="20" y="574" fill="#5F5E5A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500" text-anchor="start">承認カード（未展開）</text>
+<rect x="36" y="614" width="28" height="28" rx="6" fill="#E6F1FB"/>
+<text x="50" y="632" fill="#0C447C" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="11" font-weight="500" text-anchor="middle">AI</text>
+<text x="74" y="627" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="13" font-weight="500" text-anchor="start">AIエージェント bot</text>
+<text x="74" y="643" fill="#888780" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="11" font-weight="400" text-anchor="start">火曜 14:48</text>
+<text x="36" y="664" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="14" font-weight="500" text-anchor="start">Issue #12 顧客一覧ページを追加</text>
+<line x1="36" y1="682" x2="604" y2="682" stroke="#D3D1C7" stroke-width="0.5"/>
+<text x="36" y="706.0" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="13" font-weight="500" text-anchor="start">実装内容</text>
+<path d="M 591 699.0 L 596 705.0 L 601 699.0" fill="none" stroke="#5F5E5A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+<line x1="36" y1="722" x2="604" y2="722" stroke="#D3D1C7" stroke-width="0.5"/>
+<text x="36" y="746.0" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="13" font-weight="500" text-anchor="start">変更ファイル（1件）</text>
+<path d="M 591 739.0 L 596 745.0 L 601 739.0" fill="none" stroke="#5F5E5A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="36" y="772" width="568" height="46" rx="8" fill="#FAEEDA"/>
+<text x="48" y="790" fill="#633806" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500" text-anchor="start">未実施の確認（常時表示）</text>
+<text x="48" y="806" fill="#633806" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="400" text-anchor="start">スマートフォン表示の確認は行っていません</text>
+<text x="36" y="840" fill="#0C447C" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="13" font-weight="400" text-anchor="start">検証環境で確認 ↗</text>
+<line x1="36" y1="843" x2="108.54" y2="843" stroke="#0C447C" stroke-width="0.6"/>
+<text x="120.54" y="840" fill="#D3D1C7" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="13" font-weight="400" text-anchor="start">·</text>
+<text x="132.54000000000002" y="840" fill="#0C447C" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="13" font-weight="400" text-anchor="start">差分を見る ↗</text>
+<line x1="132.54000000000002" y1="843" x2="188.96000000000004" y2="843" stroke="#0C447C" stroke-width="0.6"/>
+<rect x="36" y="860" width="184.0" height="36" rx="8" fill="#EAF3DE" stroke="#EAF3DE" stroke-width="0.8"/>
+<text x="128.0" y="882.0" fill="#173404" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="13" font-weight="500" text-anchor="middle">承認</text>
+<rect x="228.0" y="860" width="184.0" height="36" rx="8" fill="#FFFFFF" stroke="#D3D1C7" stroke-width="0.8"/>
+<text x="320.0" y="882.0" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="13" font-weight="500" text-anchor="middle">再実装</text>
+<rect x="420.0" y="860" width="184.0" height="36" rx="8" fill="#FCEBEB" stroke="#FCEBEB" stroke-width="0.8"/>
+<text x="512.0" y="882.0" fill="#791F1F" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="13" font-weight="500" text-anchor="middle">却下</text>
+<line x1="320.0" y1="926" x2="320.0" y2="952" stroke="#0C447C" stroke-width="1.4" marker-end="url(#click-arrow)"/>
+<text x="332.0" y="944" fill="#0C447C" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500" text-anchor="start">「実装内容」の行をクリック</text>
+<rect x="20" y="978" width="600" height="366" rx="12" fill="#FFFFFF" stroke="#D3D1C7" stroke-width="0.5"/>
+<text x="20" y="958" fill="#5F5E5A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500" text-anchor="start">承認カード（実装内容を展開）</text>
+<rect x="36" y="998" width="28" height="28" rx="6" fill="#E6F1FB"/>
+<text x="50" y="1016" fill="#0C447C" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="11" font-weight="500" text-anchor="middle">AI</text>
+<text x="74" y="1011" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="13" font-weight="500" text-anchor="start">AIエージェント bot</text>
+<text x="74" y="1027" fill="#888780" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="11" font-weight="400" text-anchor="start">火曜 14:48</text>
+<text x="36" y="1048" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="14" font-weight="500" text-anchor="start">Issue #12 顧客一覧ページを追加</text>
+<rect x="32" y="1066" width="576" height="40" rx="6" fill="#E6F1FB"/>
+<line x1="36" y1="1066" x2="604" y2="1066" stroke="#D3D1C7" stroke-width="0.5"/>
+<text x="36" y="1090.0" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="13" font-weight="500" text-anchor="start">実装内容</text>
+<path d="M 591 1089.0 L 596 1083.0 L 601 1089.0" fill="none" stroke="#5F5E5A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="36" y="1120" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="13" font-weight="400" text-anchor="start">customer.json を読み込む一覧ページを作成し、</text>
+<text x="36" y="1140" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="13" font-weight="400" text-anchor="start">氏名・会社名・登録日でソートできるようにしました。</text>
+<line x1="36" y1="1154" x2="604" y2="1154" stroke="#D3D1C7" stroke-width="0.5"/>
+<text x="36" y="1178.0" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="13" font-weight="500" text-anchor="start">変更ファイル（1件）</text>
+<path d="M 591 1171.0 L 596 1177.0 L 601 1171.0" fill="none" stroke="#5F5E5A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="36" y="1204" width="568" height="46" rx="8" fill="#FAEEDA"/>
+<text x="48" y="1222" fill="#633806" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500" text-anchor="start">未実施の確認（常時表示）</text>
+<text x="48" y="1238" fill="#633806" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="400" text-anchor="start">スマートフォン表示の確認は行っていません</text>
+<text x="36" y="1272" fill="#0C447C" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="13" font-weight="400" text-anchor="start">検証環境で確認 ↗</text>
+<line x1="36" y1="1275" x2="108.54" y2="1275" stroke="#0C447C" stroke-width="0.6"/>
+<text x="120.54" y="1272" fill="#D3D1C7" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="13" font-weight="400" text-anchor="start">·</text>
+<text x="132.54000000000002" y="1272" fill="#0C447C" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="13" font-weight="400" text-anchor="start">差分を見る ↗</text>
+<line x1="132.54000000000002" y1="1275" x2="188.96000000000004" y2="1275" stroke="#0C447C" stroke-width="0.6"/>
+<rect x="36" y="1292" width="184.0" height="36" rx="8" fill="#EAF3DE" stroke="#EAF3DE" stroke-width="0.8"/>
+<text x="128.0" y="1314.0" fill="#173404" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="13" font-weight="500" text-anchor="middle">承認</text>
+<rect x="228.0" y="1292" width="184.0" height="36" rx="8" fill="#FFFFFF" stroke="#D3D1C7" stroke-width="0.8"/>
+<text x="320.0" y="1314.0" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="13" font-weight="500" text-anchor="middle">再実装</text>
+<rect x="420.0" y="1292" width="184.0" height="36" rx="8" fill="#FCEBEB" stroke="#FCEBEB" stroke-width="0.8"/>
+<text x="512.0" y="1314.0" fill="#791F1F" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="13" font-weight="500" text-anchor="middle">却下</text>
+</svg>

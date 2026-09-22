@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>5. 動作確認 - AIエージェント基盤ドキュメント</title>
+<style>
+:root {
+  --bg: #F5F4F0; --surface: #FFFFFF; --border: #D3D1C7;
+  --text: #2C2C2A; --text-secondary: #5F5E5A; --text-muted: #888780;
+  --accent: #0C447C; --accent-bg: #E6F1FB;
+  --code-bg: #F1EFE8;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font-family: -apple-system, "Segoe UI", "Hiragino Sans", "Noto Sans JP", Meiryo, sans-serif;
+  line-height: 1.75; font-size: 15px;
+}
+.layout { display: flex; min-height: 100vh; }
+nav {
+  width: 220px; flex-shrink: 0; background: var(--surface);
+  border-right: 0.5px solid var(--border); padding: 24px 16px;
+  position: sticky; top: 0; height: 100vh; overflow-y: auto;
+}
+nav .brand { font-size: 13px; font-weight: 500; color: var(--text-secondary); margin: 0 8px 16px; }
+nav a {
+  display: block; padding: 8px; border-radius: 8px; color: var(--text);
+  text-decoration: none; font-size: 14px; margin-bottom: 2px;
+}
+nav a:hover { background: var(--code-bg); }
+nav a.active { background: var(--accent-bg); color: var(--accent); font-weight: 500; }
+main { flex: 1; min-width: 0; padding: 40px 48px; max-width: 900px; }
+h1, h2, h3 { font-weight: 500; line-height: 1.4; }
+h1 { font-size: 26px; margin: 0 0 20px; }
+h2 { font-size: 20px; margin: 40px 0 16px; padding-top: 8px; border-top: 0.5px solid var(--border); }
+h3 { font-size: 17px; margin: 28px 0 12px; }
+p { margin: 0 0 14px; }
+a { color: var(--accent); }
+img { max-width: 100%; height: auto; }
+table { border-collapse: collapse; width: 100%; margin: 0 0 20px; font-size: 14px; }
+th, td { border: 0.5px solid var(--border); padding: 8px 12px; text-align: left; vertical-align: top; }
+th { background: var(--code-bg); font-weight: 500; }
+code { background: var(--code-bg); border-radius: 4px; padding: 1px 6px; font-size: 13px;
+  font-family: "Consolas", "SF Mono", monospace; }
+pre { background: var(--code-bg); border-radius: 8px; padding: 16px; overflow-x: auto;
+  font-size: 13px; line-height: 1.6; }
+pre code { background: none; padding: 0; }
+blockquote { border-left: 3px solid var(--border); margin: 0 0 14px; padding: 4px 16px;
+  color: var(--text-secondary); }
+ul, ol { padding-left: 24px; margin: 0 0 14px; }
+li { margin-bottom: 4px; }
+hr { border: none; border-top: 0.5px solid var(--border); margin: 32px 0; }
+p[align="center"] { text-align: center; margin: 24px 0; }
+</style>
+</head>
+<body>
+<div class="layout">
+<nav><p class="brand">AIエージェント基盤</p><a href="index.html">概要</a><a href="01_architecture.html">1. アーキテクチャ</a><a href="02_setup.html">2. 導入手順</a><a href="03_power_automate.html">3. Power Automate</a><a href="04_operations.html">4. 運用</a><a href="05_verification.html" class="active">5. 動作確認</a></nav>
+<main>
+<h1 id="05-実環境での動作確認チェックリスト">05. 実環境での動作確認チェックリスト</h1>
+<p>Windows・Teams・GitHub・Power Automateを実際に使った検証手順です。</p>
+<p><strong>一気に全部試さないでください。</strong> Teamsに投稿していきなり承認まで通そうとすると、
+途中で止まったときにPython・Power Automate・Teams・GitHubのどこが原因か
+切り分けられません。ここでは6段階に分け、<strong>下の層から順に</strong>確認します。</p>
+<pre><code>段階0  Python単体（Teams/Power Automateを経由しない）
+段階1  ①Teams投稿 → Issue作成 だけ
+段階2  質問と回答の往復（②③④）
+段階3  フル1周（Issue作成 → 実装 → 承認 → マージ）
+段階4  却下・再実装
+段階5  並走（2件同時）
+</code></pre>
+<p>各段階はチェックボックス形式です。詰まったら「11. うまくいかなかったときの記録」
+の形式でログをまとめてもらえれば、リモートでも調査できます。</p>
+<h2 id="0-前提条件ここが揃うまで先へ進まない">0. 前提条件（ここが揃うまで先へ進まない）</h2>
+<ul>
+<li>[ ] <code>python agent\agent_cli.py doctor</code> が全て <code>[OK]</code></li>
+<li>[ ] <code>pytest</code>（<code>agent/</code> 配下）がグリーン</li>
+<li>[ ] <code>docs/03_power_automate.md</code> 5章の<strong>必須修正</strong>を適用済み
+      （③の出力先を <code>/work/agent/approval</code> に、①⑤のBot除外・空コメント対策）</li>
+<li>[ ] 依頼チャネルと通知チャネルが別になっている</li>
+<li>[ ] <code>gh auth status</code> が通る</li>
+<li>[ ] <code>tools</code> と <code>tools-beta</code> がクローン済み、<code>tools-beta</code> のGitHub Pagesが有効</li>
+<li>[ ] 自動投入を使う場合は <code>agent_cli.py test-click</code> でCline入力欄の座標を確認済み
+      （不安な場合は最初は <code>--manual</code> で進める）</li>
+</ul>
+<p><strong>推奨</strong>: 最初の一周は本番の <code>tools</code> ではなく、使い捨てできる検証用リポジトリで
+試してください。壊れても被害が無い状態で動きを掴んでから本番へ切り替えるのが安全です。</p>
+<h2 id="1-最小テストシナリオ">1. 最小テストシナリオ</h2>
+<p>3つのIssue相当の依頼を用意します。承認・質問・却下の3系統を1つずつ確認できます。</p>
+<table>
+<thead>
+<tr>
+<th>シナリオ</th>
+<th>内容</th>
+<th>目的</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A（正常系）</td>
+<td>「検証用ページ(verify-a)を作ってください。見出しだけのシンプルなページで構いません」</td>
+<td>承認までの一周を確認</td>
+</tr>
+<tr>
+<td>B（質問系）</td>
+<td>「データを表示するページを作ってください」（取得元をわざと曖昧にする）</td>
+<td>Clineが質問を出す経路を確認</td>
+</tr>
+<tr>
+<td>C（却下系）</td>
+<td>シナリオAの完了後にわざと却下する</td>
+<td>needs-reworkラベル付与を確認</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="段階0-python単体teamspower-automateを経由しない">段階0: Python単体（Teams/Power Automateを経由しない）</h2>
+<p>Power AutomateやTeamsの設定ミスと、Python側の不具合を切り分けるため、
+最初はTeamsを一切使わずに <code>agent_cli.py</code> から直接動かします。</p>
+<pre><code class="language-powershell"># 手動でGitHub Issueを1件作る（Webから、または gh issue create）
+gh issue create --repo &lt;owner&gt;/tools --title &quot;検証用ページ(verify-a)&quot; `
+  --body &quot;見出しだけのシンプルなページを作ってください。&quot;
+
+# 表示されたIssue番号を使って、直接実装ワーカーを起動する
+python agent\implement_agent.py &lt;Issue番号&gt; --manual
+</code></pre>
+<ul>
+<li>[ ] <code>worktrees/issue-&lt;N&gt;</code> が作られる（<code>git worktree list</code> で確認）</li>
+<li>[ ] コンソールに「実装完了を待機します」のログが出て、クリップボードに
+      プロンプトがコピーされる</li>
+<li>[ ] VS Codeで該当worktreeを開き、Clineへ <code>Ctrl+V</code> → <code>Enter</code> で貼り付ける</li>
+<li>[ ] Clineの実装が終わったら <code>.agent-summary.json</code> を作らせる
+      （プロンプト通りに動いていれば自動で作られるはず）</li>
+<li>[ ] コンソールに「実装完了サマリーを検出しました」と出て、コミット・push・
+      ドラフトPR作成まで自動で進む</li>
+<li>[ ] <code>python agent\agent_cli.py status</code> で <code>waiting_approval</code> になっている</li>
+<li>[ ] GitHub上にドラフトPRができている（<code>Closes #N</code> を含む本文）</li>
+<li>[ ] tools-betaに <code>preview/issue-&lt;N&gt;/</code> ができ、ブラウザで崩れずに開ける
+      （弱点3の確認: 変更していない共有CSS/画像も一緒に配置されているか）</li>
+</ul>
+<p>ここまで通れば、Git操作・Cline連携・プレビュー公開・PR作成というPythonの
+中核部分は正しく動いています。次に承認だけTeamsを介さず試します。</p>
+<pre><code class="language-powershell">python agent\agent_cli.py approve &lt;Issue番号&gt;
+</code></pre>
+<ul>
+<li>[ ] <code>finish_agent</code> のログに、文字化けチェック → 静的チェック（弱点8）→
+      マージ、の順で進む</li>
+<li>[ ] GitHubでPRがsquash mergeされ、Issueがクローズされる</li>
+<li>[ ] <code>preview/issue-&lt;N&gt;/</code> が削除される</li>
+<li>[ ] <code>worktrees/issue-&lt;N&gt;</code> が削除される（<code>git worktree list</code> で確認）</li>
+</ul>
+<p>段階0が全部通ってから、段階1へ進んでください。</p>
+<hr />
+<h2 id="段階1-①teams投稿--issue作成-だけ">段階1: ①Teams投稿 → Issue作成 だけ</h2>
+<p>常駐は <code>issue_agent.py</code> だけ起動します。</p>
+<pre><code class="language-powershell">python agent\issue_agent.py
+</code></pre>
+<p>Teamsの依頼チャネルへシナリオAの文面を投稿します。</p>
+<ul>
+<li>[ ] OneDriveの <code>request/</code> に一瞬JSONが作られ、すぐ <code>request/done/</code> へ移動する</li>
+<li>[ ] <code>issue_agent</code> のログに「Issue作成」の行が出る</li>
+<li>[ ] GitHub上に新しいIssueが実際に作成される
+      （タイトル・本文・受入条件チェックリストの形式を確認）</li>
+<li>[ ] Teamsの依頼スレッドに📝作成通知の<strong>返信</strong>が来る（④フロー経由）</li>
+<li>[ ] 同じ投稿をもう一度Power Automateから手動実行しても、Issueが二重に
+      作られない（<code>state/processed/</code> の重複防止マーカーを確認）</li>
+<li>[ ] <code>python agent\agent_cli.py status</code> で対象Issueが <code>created</code> になっている</li>
+</ul>
+<hr />
+<h2 id="段階2-質問と回答の往復②③④">段階2: 質問と回答の往復（②③④）</h2>
+<p><code>orchestrator.py</code> も起動し、シナリオBの文面を投稿します。</p>
+<pre><code class="language-powershell">python agent\orchestrator.py --parallel 1 --manual
+</code></pre>
+<ul>
+<li>[ ] <code>orchestrator</code> のログで <code>created</code> → <code>queued</code> → <code>implementing</code> と進む</li>
+<li>[ ] Clineが <code>.agent-question.json</code> を作る</li>
+<li>[ ] <code>question/</code> にJSONが出力され、Teams通知チャネルに選択式カードが出る</li>
+<li>[ ] <strong>3件目の選択肢が無い質問で、カードの3件目が空欄のまま出ないか確認</strong>
+      （<code>docs/03_power_automate.md</code> 3章で触れた既知の注意点）</li>
+<li>[ ] カードで回答を選ぶ → <code>decision/</code> にJSONが作られる</li>
+<li>[ ] コンソールログに <code>questionId</code> 不一致の警告が出ていないこと
+      （出ていたら弱点2のロジックが意図せず発火している可能性があるので、
+      <code>question/</code> と <code>decision/</code> に残っているJSONの <code>questionId</code> を見比べる）</li>
+<li>[ ] 回答がClineへ渡り、実装が再開して <code>.agent-summary.json</code> が作られる</li>
+</ul>
+<hr />
+<h2 id="段階3-フル1周承認まで">段階3: フル1周（承認まで）</h2>
+<p><code>approval_agent.py</code> も起動し、3常駐すべてを動かします。</p>
+<pre><code class="language-powershell">powershell -ExecutionPolicy Bypass -File .\scripts\start_all.ps1 -Parallel 1 -Manual
+</code></pre>
+<p>シナリオAをTeamsへ投稿し、承認まで通します。</p>
+<ul>
+<li>[ ] <code>waiting/</code> にJSONが出力され、Teams通知チャネルに承認カードが出る</li>
+<li>[ ] 「未実施の確認」欄の有無を確認する。<strong>空のまま届いた場合、
+      <code>.agent-summary.json</code> が作られずフォールバック進行している可能性がある</strong>
+      （弱点4の警告文が出ているか、<code>logs/issue-&lt;N&gt;.log</code> を確認）</li>
+<li>[ ] プレビューURLとPRリンクが両方クリックでき、正しいページが開く</li>
+<li>[ ] 「✅ 承認」を押す</li>
+<li>[ ] <code>approval_agent</code> のログで振り分け（approve → finish_agent起動）を確認</li>
+<li>[ ] mainへマージされ、Issueが自動クローズされる</li>
+<li>[ ] Teamsに🎉完了通知が届く</li>
+<li>[ ] <code>preview/issue-&lt;N&gt;/</code> と <code>worktrees/issue-&lt;N&gt;</code> が両方削除される</li>
+</ul>
+<hr />
+<h2 id="段階4-却下再実装">段階4: 却下・再実装</h2>
+<p>シナリオAをもう一度通し、承認カードで「却下」を押します。</p>
+<ul>
+<li>[ ] <code>finish_agent</code> の <code>reject()</code> が動く</li>
+<li>[ ] <strong>GitHub Issueがcloseされず、openのまま残る</strong>（弱点9の確認）</li>
+<li>[ ] Issueに <code>needs-rework</code> ラベルが付く</li>
+<li>[ ] Issueへ却下理由と <code>agent_cli.py retry</code> の案内コメントが入る</li>
+<li>[ ] Teamsに❌却下通知が届く</li>
+<li>[ ] <code>python agent\agent_cli.py retry &lt;Issue番号&gt;</code> で <code>created</code> に戻り、
+      <code>state/done/</code> から復元されたことがログで分かる</li>
+<li>[ ] 再度orchestratorが拾って実装が始まる</li>
+</ul>
+<p>次に、承認カードで「再実装」を選ぶケースも確認します。</p>
+<ul>
+<li>[ ] <code>.agent-rework.txt</code> がworktree直下に作られる</li>
+<li>[ ] 同じブランチ・同じworktreeのまま実装が再開する</li>
+<li>[ ] 既存のPRにコミットが追加される（新しいPRが作られていないこと）</li>
+</ul>
+<hr />
+<h2 id="段階5-並走2件同時">段階5: 並走（2件同時）</h2>
+<p>この一式の目的そのものです。2つの依頼をほぼ同時にTeamsへ投稿します。</p>
+<pre><code class="language-powershell">powershell -ExecutionPolicy Bypass -File .\scripts\start_all.ps1 -Parallel 2
+</code></pre>
+<ul>
+<li>[ ] 2件とも <code>state</code> 上で <code>implementing</code> まで同時に進む
+      （片方が終わるまでもう片方が <code>queued</code> のまま止まらないこと）</li>
+<li>[ ] 2つ目のVS Codeウィンドウが<strong>正しいworktree</strong>で開く
+      （誤って1つ目のウィンドウに入らないか。弱点1の確認）</li>
+<li>[ ] Cline貼り付けの瞬間だけ順番待ちになる
+      （ログに「GUIロック待機中」が出て、実装自体は両方進んでいること）</li>
+<li>[ ] 2件とも最終的に別々のPR・別々のプレビューURLで承認まで進む</li>
+</ul>
+<hr />
+<h2 id="6-段階を通して見ておきたいポイント">6. 段階を通して見ておきたいポイント</h2>
+<table>
+<thead>
+<tr>
+<th>確認項目</th>
+<th>見る場所</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>各工程フォルダにJSONが溜まっていないか</td>
+<td><code>request/</code> <code>question/</code> <code>decision/</code> <code>waiting/</code> <code>approval/</code> <code>reply/</code>（<code>done/</code>以外）</td>
+</tr>
+<tr>
+<td>ロックが残っていないか</td>
+<td><code>python agent\agent_cli.py unlock</code>（起動前後で実行して差分を見る）</td>
+</tr>
+<tr>
+<td>文字化けしていないか</td>
+<td>生成されたHTMLをブラウザで直接開く（日本語部分を目視）</td>
+</tr>
+<tr>
+<td>ログの異常終了</td>
+<td><code>logs/issue-&lt;N&gt;.log</code> に <code>[ERROR]</code> が無いか</td>
+</tr>
+</tbody>
+</table>
+<h2 id="7-うまくいかなかったときの記録の仕方">7. うまくいかなかったときの記録の仕方</h2>
+<p>次の形式でまとめてもらえると、リモートでも原因を調査しやすくなります。</p>
+<pre><code>■ 起きたこと
+（期待した動きと、実際の動きの差）
+
+■ どの段階・どのシナリオか
+（例: 段階2, シナリオB）
+
+■ ログ（logs/issue-&lt;N&gt;.log の該当部分）
+
+
+■ state/issue-&lt;N&gt;.json の中身
+
+
+■ 該当フォルダに残っているJSON（あれば、ファイル名とdoneに移動したか）
+
+</code></pre>
+<p>このテンプレへの記入を貼ってもらえれば、コード側の問題として調査・修正します。</p>
+</main>
+</div>
+</body>
+</html>

@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>2. 導入手順 - AIエージェント基盤ドキュメント</title>
+<style>
+:root {
+  --bg: #F5F4F0; --surface: #FFFFFF; --border: #D3D1C7;
+  --text: #2C2C2A; --text-secondary: #5F5E5A; --text-muted: #888780;
+  --accent: #0C447C; --accent-bg: #E6F1FB;
+  --code-bg: #F1EFE8;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font-family: -apple-system, "Segoe UI", "Hiragino Sans", "Noto Sans JP", Meiryo, sans-serif;
+  line-height: 1.75; font-size: 15px;
+}
+.layout { display: flex; min-height: 100vh; }
+nav {
+  width: 220px; flex-shrink: 0; background: var(--surface);
+  border-right: 0.5px solid var(--border); padding: 24px 16px;
+  position: sticky; top: 0; height: 100vh; overflow-y: auto;
+}
+nav .brand { font-size: 13px; font-weight: 500; color: var(--text-secondary); margin: 0 8px 16px; }
+nav a {
+  display: block; padding: 8px; border-radius: 8px; color: var(--text);
+  text-decoration: none; font-size: 14px; margin-bottom: 2px;
+}
+nav a:hover { background: var(--code-bg); }
+nav a.active { background: var(--accent-bg); color: var(--accent); font-weight: 500; }
+main { flex: 1; min-width: 0; padding: 40px 48px; max-width: 900px; }
+h1, h2, h3 { font-weight: 500; line-height: 1.4; }
+h1 { font-size: 26px; margin: 0 0 20px; }
+h2 { font-size: 20px; margin: 40px 0 16px; padding-top: 8px; border-top: 0.5px solid var(--border); }
+h3 { font-size: 17px; margin: 28px 0 12px; }
+p { margin: 0 0 14px; }
+a { color: var(--accent); }
+img { max-width: 100%; height: auto; }
+table { border-collapse: collapse; width: 100%; margin: 0 0 20px; font-size: 14px; }
+th, td { border: 0.5px solid var(--border); padding: 8px 12px; text-align: left; vertical-align: top; }
+th { background: var(--code-bg); font-weight: 500; }
+code { background: var(--code-bg); border-radius: 4px; padding: 1px 6px; font-size: 13px;
+  font-family: "Consolas", "SF Mono", monospace; }
+pre { background: var(--code-bg); border-radius: 8px; padding: 16px; overflow-x: auto;
+  font-size: 13px; line-height: 1.6; }
+pre code { background: none; padding: 0; }
+blockquote { border-left: 3px solid var(--border); margin: 0 0 14px; padding: 4px 16px;
+  color: var(--text-secondary); }
+ul, ol { padding-left: 24px; margin: 0 0 14px; }
+li { margin-bottom: 4px; }
+hr { border: none; border-top: 0.5px solid var(--border); margin: 32px 0; }
+p[align="center"] { text-align: center; margin: 24px 0; }
+</style>
+</head>
+<body>
+<div class="layout">
+<nav><p class="brand">AIエージェント基盤</p><a href="index.html">概要</a><a href="01_architecture.html">1. アーキテクチャ</a><a href="02_setup.html" class="active">2. 導入手順</a><a href="03_power_automate.html">3. Power Automate</a><a href="04_operations.html">4. 運用</a><a href="05_verification.html">5. 動作確認</a></nav>
+<main>
+<h1 id="02-導入手順">02. 導入手順</h1>
+<h2 id="1-前提ソフトウェア">1. 前提ソフトウェア</h2>
+<table>
+<thead>
+<tr>
+<th>ソフト</th>
+<th>用途</th>
+<th>確認</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Python 3.10以上</td>
+<td>エージェント本体</td>
+<td><code>python --version</code></td>
+</tr>
+<tr>
+<td>Git 2.30以上</td>
+<td>worktree を使うため</td>
+<td><code>git --version</code></td>
+</tr>
+<tr>
+<td>GitHub CLI (gh)</td>
+<td>Issue/PR/マージ操作</td>
+<td><code>gh --version</code></td>
+</tr>
+<tr>
+<td>VS Code + Cline拡張</td>
+<td>実装</td>
+<td><code>code --version</code></td>
+</tr>
+<tr>
+<td>OneDrive 同期クライアント</td>
+<td>状態フォルダ</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p><code>gh</code> は先に認証しておきます。</p>
+<pre><code class="language-powershell">gh auth login
+gh auth status
+</code></pre>
+<h2 id="2-githubの準備">2. GitHubの準備</h2>
+<h3 id="21-リポジトリ">2.1 リポジトリ</h3>
+<table>
+<thead>
+<tr>
+<th>リポジトリ</th>
+<th>役割</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>&lt;owner&gt;/tools</code></td>
+<td>本体。<code>main</code> が本番</td>
+</tr>
+<tr>
+<td><code>&lt;owner&gt;/tools-beta</code></td>
+<td>承認前の動作確認用。GitHub Pages を有効化する</td>
+</tr>
+</tbody>
+</table>
+<p><code>tools-beta</code> の <strong>Settings → Pages</strong> で、
+Source を <code>Deploy from a branch</code>、Branch を <code>main / (root)</code> にします。</p>
+<h3 id="22-personal-access-token">2.2 Personal Access Token</h3>
+<p>Issue作成に使います（Fine-grained推奨）。</p>
+<ul>
+<li>Repository access: <code>tools</code></li>
+<li>Permissions: <code>Issues: Read and write</code>, <code>Contents: Read and write</code>, <code>Pull requests: Read and write</code></li>
+</ul>
+<h3 id="23-クローン">2.3 クローン</h3>
+<pre><code class="language-powershell">gh repo clone &lt;owner&gt;/tools      C:\repo\tools
+gh repo clone &lt;owner&gt;/tools-beta C:\repo\tools-beta
+</code></pre>
+<p><code>C:\repo\worktrees</code> は自動生成されるので作成不要です。</p>
+<blockquote>
+<p>OneDrive同期フォルダの中にリポジトリを置かないでください。
+<code>.git</code> が同期対象になると破損します。<code>C:\repo</code> のようなローカルパスを使います。</p>
+</blockquote>
+<h2 id="3-セットアップスクリプト">3. セットアップスクリプト</h2>
+<pre><code class="language-powershell">cd ai-agent-system
+powershell -ExecutionPolicy Bypass -File .\scripts\setup.ps1 `
+    -GitHubOwner &quot;ymatsuda-cmyk&quot; `
+    -GitHubRepo &quot;tools&quot; `
+    -GitHubBeta &quot;tools-beta&quot; `
+    -TargetRepo &quot;C:\repo\tools&quot; `
+    -BetaRepo &quot;C:\repo\tools-beta&quot; `
+    -WorktreeRoot &quot;C:\repo\worktrees&quot; `
+    -MaxParallel 3
+</code></pre>
+<p>トークンだけは別途設定します。</p>
+<pre><code class="language-powershell">setx GITHUB_TOKEN &quot;github_pat_xxxxxxxxxxxx&quot;
+</code></pre>
+<p>設定後、<strong>PowerShellを開き直してください</strong>（<code>setx</code> は既存プロセスに反映されません）。</p>
+<h2 id="4-環境変数一覧">4. 環境変数一覧</h2>
+<table>
+<thead>
+<tr>
+<th>変数</th>
+<th>必須</th>
+<th>既定</th>
+<th>説明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GITHUB_TOKEN</code></td>
+<td>○</td>
+<td>—</td>
+<td>Issue作成用PAT</td>
+</tr>
+<tr>
+<td><code>GITHUB_OWNER</code></td>
+<td>○</td>
+<td>—</td>
+<td>リポジトリのオーナー</td>
+</tr>
+<tr>
+<td><code>GITHUB_REPO</code></td>
+<td>○</td>
+<td>—</td>
+<td>本体リポジトリ名</td>
+</tr>
+<tr>
+<td><code>GITHUB_BETA_REPO</code></td>
+<td></td>
+<td><code>tools-beta</code></td>
+<td>検証用リポジトリ名</td>
+</tr>
+<tr>
+<td><code>AGENT_ROOT</code></td>
+<td>○</td>
+<td>—</td>
+<td>OneDrive上の <code>work\agent</code></td>
+</tr>
+<tr>
+<td><code>TARGET_REPO_PATH</code></td>
+<td>○</td>
+<td>—</td>
+<td>本体クローンのパス</td>
+</tr>
+<tr>
+<td><code>BETA_REPO_PATH</code></td>
+<td></td>
+<td>本体の隣</td>
+<td>検証用クローンのパス</td>
+</tr>
+<tr>
+<td><code>AGENT_WORKTREE_ROOT</code></td>
+<td></td>
+<td><code>&lt;本体の親&gt;\worktrees</code></td>
+<td>worktree置き場</td>
+</tr>
+<tr>
+<td><code>BASE_BRANCH</code></td>
+<td></td>
+<td><code>main</code></td>
+<td>ベースブランチ</td>
+</tr>
+<tr>
+<td><code>AGENT_MAX_PARALLEL</code></td>
+<td></td>
+<td><code>3</code></td>
+<td>同時実行数</td>
+</tr>
+<tr>
+<td><code>AGENT_GUI_MODE</code></td>
+<td></td>
+<td><code>auto</code></td>
+<td><code>manual</code> にすると手動貼り付け</td>
+</tr>
+<tr>
+<td><code>AGENT_CLINE_INPUT_X</code></td>
+<td></td>
+<td><code>1500</code></td>
+<td>Cline入力欄のX座標</td>
+</tr>
+<tr>
+<td><code>AGENT_CLINE_INPUT_Y</code></td>
+<td></td>
+<td><code>900</code></td>
+<td>Cline入力欄のY座標</td>
+</tr>
+<tr>
+<td><code>AGENT_IMPLEMENTATION_TIMEOUT</code></td>
+<td></td>
+<td><code>1800</code></td>
+<td>実装待ち秒数</td>
+</tr>
+<tr>
+<td><code>AGENT_DECISION_TIMEOUT</code></td>
+<td></td>
+<td><code>7200</code></td>
+<td>回答待ち秒数</td>
+</tr>
+<tr>
+<td><code>AGENT_GUI_LOCK_TIMEOUT</code></td>
+<td></td>
+<td><code>1800</code></td>
+<td>GUIロック待ち秒数</td>
+</tr>
+</tbody>
+</table>
+<p>個別にフォルダを変えたい場合は <code>AGENT_REQUEST_DIR</code> など
+<code>AGENT_&lt;名前&gt;_DIR</code> で上書きできます（既定は <code>AGENT_ROOT</code> 配下）。</p>
+<h2 id="5-cline入力欄の座標を合わせる">5. Cline入力欄の座標を合わせる</h2>
+<p>自動投入（<code>AGENT_GUI_MODE=auto</code>）を使う場合、
+Clineのチャット入力欄の座標を教える必要があります。</p>
+<pre><code class="language-powershell">python agent\agent_cli.py test-click
+</code></pre>
+<p>5秒後に指定座標をクリックして文字を打ちます。
+入力欄に入らない場合は、Windowsの「拡大縮小」が100%か確認し、
+<code>AGENT_CLINE_INPUT_X</code> / <code>AGENT_CLINE_INPUT_Y</code> を調整してください。</p>
+<blockquote>
+<p>座標指定が安定しない環境では <code>AGENT_GUI_MODE=manual</code> を推奨します。
+Ctrl+V → Enter の2操作だけ人が行う運用になり、並走も問題なく動きます。</p>
+</blockquote>
+<h2 id="6-点検">6. 点検</h2>
+<pre><code class="language-powershell">python agent\agent_cli.py doctor
+</code></pre>
+<p>コマンド・Pythonモジュール・フォルダ・リポジトリ・gh認証を確認します。
+すべて <code>[OK]</code> になれば準備完了です。</p>
+<p>あわせて自動テストも通しておくと、環境固有の問題ではなく
+コード側の問題かどうかの切り分けがしやすくなります。</p>
+<pre><code class="language-powershell">pip install -r agent\requirements-dev.txt
+pytest agent
+</code></pre>
+<h2 id="7-power-automate">7. Power Automate</h2>
+<p><code>docs/03_power_automate.md</code> を参照してください。</p>
+<h2 id="8-起動">8. 起動</h2>
+<pre><code class="language-powershell">powershell -ExecutionPolicy Bypass -File .\scripts\start_all.ps1 -Parallel 3
+</code></pre>
+<p>3つのPowerShellウィンドウが開きます。</p>
+<ul>
+<li><code>AGENT: issue</code> … Teams投稿の監視</li>
+<li><code>AGENT: orchestrator</code> … 実装ワーカーの割り当て</li>
+<li><code>AGENT: approval</code> … 承認結果の処理</li>
+</ul>
+<p>停止は <code>scripts\stop_all.ps1</code> です。</p>
+<h2 id="9-動作確認">9. 動作確認</h2>
+<p>一気に全部（Teams投稿→承認）を試すと、途中で止まったときに
+Python・Power Automate・Teams・GitHubのどこが原因か切り分けられません。</p>
+<p><code>docs/05_verification.md</code> に、Teamsを経由しないPython単体の確認から
+段階的にレイヤーを足していくチェックリストがあります。
+まずはそちらに沿って進めてください。</p>
+<p>途中で止まった場合は次で状態を確認します。</p>
+<pre><code class="language-powershell">python agent\agent_cli.py status
+python agent\agent_cli.py show &lt;Issue番号&gt;
+</code></pre>
+</main>
+</div>
+</body>
+</html>

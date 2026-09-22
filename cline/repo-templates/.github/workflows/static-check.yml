@@ -1,0 +1,110 @@
+# マージ前の簡易静的チェック（PRレベル）
+#
+# agent/agent_core/checks.py と同じ観点（HTMLタグの対応、ローカルリンク切れ）を
+# PR上でも検査する。finish_agent.py 側の検査は環境非依存で必ず効くが、
+# こちらはPR画面のチェックとして人にも見える形で残しておくためのもの。
+#
+# 使い方: このファイルを tools / tools-beta それぞれの
+#   .github/workflows/static-check.yml としてコピーする。
+# 必要なら GitHub の Branch protection rules で
+# 「static-check」を必須チェックに設定する。
+
+name: static-check
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  html-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: HTMLタグの対応とローカルリンク切れを検査
+        shell: python
+        run: |
+          import pathlib
+          import sys
+          from html.parser import HTMLParser
+          from urllib.parse import urlparse
+
+          VOID_TAGS = {
+              "area", "base", "br", "col", "embed", "hr", "img", "input",
+              "link", "meta", "param", "source", "track", "wbr",
+          }
+          LINK_ATTRS = {"href", "src"}
+
+          class Auditor(HTMLParser):
+              def __init__(self):
+                  super().__init__()
+                  self.stack, self.unbalanced, self.references = [], [], []
+
+              def handle_starttag(self, tag, attrs):
+                  d = dict(attrs)
+                  for name in LINK_ATTRS:
+                      if d.get(name):
+                          self.references.append(d[name])
+                  if tag not in VOID_TAGS:
+                      self.stack.append(tag)
+
+              def handle_endtag(self, tag):
+                  if self.stack and self.stack[-1] == tag:
+                      self.stack.pop()
+                  elif tag in self.stack:
+                      while self.stack and self.stack[-1] != tag:
+                          self.unbalanced.append(f"開始タグ <{self.stack.pop()}> が閉じられていません")
+                      if self.stack:
+                          self.stack.pop()
+                  else:
+                      self.unbalanced.append(f"対応する開始タグの無い </{tag}>")
+
+          def resolve(raw, source, root):
+              value = raw.strip()
+              if not value or value.startswith("#"):
+                  return None
+              parsed = urlparse(value)
+              if parsed.scheme or value.startswith("//"):
+                  return None
+              clean = parsed.path
+              if not clean:
+                  return None
+              if clean.startswith("/"):
+                  return root / clean.lstrip("/")
+              return (source.parent / clean).resolve()
+
+          root = pathlib.Path(".").resolve()
+          failed = False
+
+          for path in sorted(root.rglob("*.html")):
+              if ".git" in path.parts:
+                  continue
+              try:
+                  text = path.read_text(encoding="utf-8")
+              except (OSError, UnicodeDecodeError):
+                  print(f"::error file={path}::UTF-8として読み込めません")
+                  failed = True
+                  continue
+
+              auditor = Auditor()
+              auditor.feed(text)
+
+              for issue in auditor.unbalanced:
+                  print(f"::error file={path}::{issue}")
+                  failed = True
+              if auditor.stack:
+                  tags = ", ".join(f"<{t}>" for t in auditor.stack[:5])
+                  print(f"::error file={path}::閉じられていないタグが残っています: {tags}")
+                  failed = True
+
+              for raw in auditor.references:
+                  target = resolve(raw, path, root)
+                  if target is not None and not target.exists():
+                      print(f"::error file={path}::リンク切れ: {raw}")
+                      failed = True
+
+          sys.exit(1 if failed else 0)

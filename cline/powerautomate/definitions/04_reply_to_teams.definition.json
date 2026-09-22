@@ -1,0 +1,228 @@
+{
+  "name": "a7f3c1e2-04re-4ply-9f00-agentreplyflow",
+  "id": "/providers/Microsoft.Flow/flows/a7f3c1e2-04re-4ply-9f00-agentreplyflow",
+  "type": "Microsoft.Flow/flows",
+  "properties": {
+    "apiId": "/providers/Microsoft.PowerApps/apis/shared_logicflows",
+    "displayName": "04_reply→Teams通知",
+    "definition": {
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "1.0.0.0",
+      "parameters": {
+        "$authentication": {
+          "defaultValue": {},
+          "type": "SecureObject"
+        },
+        "$connections": {
+          "defaultValue": {},
+          "type": "Object"
+        }
+      },
+      "triggers": {
+        "ファイルが作成されたとき": {
+          "recurrence": {
+            "frequency": "Minute",
+            "interval": 1
+          },
+          "metadata": {
+            "b!l98glqqOzk2L67y4G1GnjB9sMszcb2tOg5ceVAfXkHvpNNoPCisnS7V4W44zI5dX.REPLACE_WITH_REPLY_FOLDER_ID": "/work/agent/reply"
+          },
+          "type": "OpenApiConnection",
+          "inputs": {
+            "parameters": {
+              "folderId": "b!l98glqqOzk2L67y4G1GnjB9sMszcb2tOg5ceVAfXkHvpNNoPCisnS7V4W44zI5dX.REPLACE_WITH_REPLY_FOLDER_ID",
+              "includeSubfolders": false,
+              "inferContentType": true
+            },
+            "host": {
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_onedriveforbusiness",
+              "connectionName": "shared_onedriveforbusiness",
+              "operationId": "OnNewFileV2"
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        }
+      },
+      "actions": {
+        "ファイルコンテンツの取得": {
+          "runAfter": {},
+          "type": "OpenApiConnection",
+          "inputs": {
+            "parameters": {
+              "id": "@triggerOutputs()?['headers/x-ms-file-id']",
+              "inferContentType": true
+            },
+            "host": {
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_onedriveforbusiness",
+              "connectionName": "shared_onedriveforbusiness",
+              "operationId": "GetFileContent"
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        },
+        "文字列へ変換": {
+          "runAfter": {
+            "ファイルコンテンツの取得": [
+              "Succeeded"
+            ]
+          },
+          "type": "Compose",
+          "inputs": "@base64ToString(body('ファイルコンテンツの取得')?['$content'])"
+        },
+        "JSONの解析": {
+          "runAfter": {
+            "文字列へ変換": [
+              "Succeeded"
+            ]
+          },
+          "type": "ParseJson",
+          "inputs": {
+            "content": "@json(outputs('文字列へ変換'))",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "issueNumber": {
+                  "type": "integer"
+                },
+                "issueTitle": {
+                  "type": "string"
+                },
+                "issueUrl": {
+                  "type": "string"
+                },
+                "branch": {
+                  "type": "string"
+                },
+                "messageId": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                },
+                "previewUrl": {
+                  "type": "string"
+                },
+                "pullRequestUrl": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "返信先の判定": {
+          "runAfter": {
+            "JSONの解析": [
+              "Succeeded"
+            ]
+          },
+          "type": "If",
+          "expression": {
+            "and": [
+              {
+                "not": {
+                  "equals": [
+                    "@coalesce(body('JSONの解析')?['messageId'], '')",
+                    ""
+                  ]
+                }
+              }
+            ]
+          },
+          "actions": {
+            "元の投稿へ返信": {
+              "type": "OpenApiConnection",
+              "inputs": {
+                "parameters": {
+                  "poster": "Flow bot",
+                  "location": "Channel",
+                  "body/recipient/groupId": "e48a3383-067a-4192-8265-46871924d1f2",
+                  "body/recipient/channelId": "19:-oyJ2FnxixF__MVDZ3c6dH4TWQXJDCUdqAreFbO3FuU1@thread.tacv2",
+                  "body/messageBody": "{\n  \"$schema\": \"http://adaptivecards.io/schemas/adaptive-card.json\",\n  \"type\": \"AdaptiveCard\",\n  \"version\": \"1.5\",\n  \"body\": [\n    {\n      \"type\": \"TextBlock\",\n      \"size\": \"Medium\",\n      \"weight\": \"Bolder\",\n      \"text\": \"Issue #@{body('JSONの解析')?['issueNumber']} @{body('JSONの解析')?['issueTitle']}\",\n      \"wrap\": true\n    },\n    {\n      \"type\": \"TextBlock\",\n      \"text\": \"@{body('JSONの解析')?['message']}\",\n      \"wrap\": true,\n      \"spacing\": \"Medium\"\n    },\n    {\n      \"type\": \"FactSet\",\n      \"spacing\": \"Medium\",\n      \"facts\": [\n        { \"title\": \"状態\", \"value\": \"@{body('JSONの解析')?['status']}\" },\n        { \"title\": \"ブランチ\", \"value\": \"@{coalesce(body('JSONの解析')?['branch'], '-')}\" }\n      ]\n    }\n  ],\n  \"actions\": [\n    {\n      \"type\": \"Action.OpenUrl\",\n      \"title\": \"Issueを開く\",\n      \"url\": \"@{coalesce(body('JSONの解析')?['issueUrl'], 'https://github.com')}\"\n    }\n  ]\n}",
+                  "body/replyToId": "@body('JSONの解析')?['messageId']"
+                },
+                "host": {
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_teams",
+                  "connectionName": "shared_teams",
+                  "operationId": "PostCardToConversation"
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            }
+          },
+          "else": {
+            "actions": {
+              "通知チャネルへ投稿": {
+                "type": "OpenApiConnection",
+                "inputs": {
+                  "parameters": {
+                    "poster": "Flow bot",
+                    "location": "Channel",
+                    "body/recipient/groupId": "e48a3383-067a-4192-8265-46871924d1f2",
+                    "body/recipient/channelId": "19:531SffW7NFVqCkPsmNbJdagSQhKNjNNCkVoNvdPRRbc1@thread.tacv2",
+                    "body/messageBody": "{\n  \"$schema\": \"http://adaptivecards.io/schemas/adaptive-card.json\",\n  \"type\": \"AdaptiveCard\",\n  \"version\": \"1.5\",\n  \"body\": [\n    {\n      \"type\": \"TextBlock\",\n      \"size\": \"Medium\",\n      \"weight\": \"Bolder\",\n      \"text\": \"Issue #@{body('JSONの解析')?['issueNumber']} @{body('JSONの解析')?['issueTitle']}\",\n      \"wrap\": true\n    },\n    {\n      \"type\": \"TextBlock\",\n      \"text\": \"@{body('JSONの解析')?['message']}\",\n      \"wrap\": true,\n      \"spacing\": \"Medium\"\n    },\n    {\n      \"type\": \"FactSet\",\n      \"spacing\": \"Medium\",\n      \"facts\": [\n        { \"title\": \"状態\", \"value\": \"@{body('JSONの解析')?['status']}\" },\n        { \"title\": \"ブランチ\", \"value\": \"@{coalesce(body('JSONの解析')?['branch'], '-')}\" }\n      ]\n    }\n  ],\n  \"actions\": [\n    {\n      \"type\": \"Action.OpenUrl\",\n      \"title\": \"Issueを開く\",\n      \"url\": \"@{coalesce(body('JSONの解析')?['issueUrl'], 'https://github.com')}\"\n    }\n  ]\n}"
+                  },
+                  "host": {
+                    "apiId": "/providers/Microsoft.PowerApps/apis/shared_teams",
+                    "connectionName": "shared_teams",
+                    "operationId": "PostCardToConversation"
+                  },
+                  "authentication": "@parameters('$authentication')"
+                }
+              }
+            }
+          }
+        },
+        "処理済みへ移動": {
+          "runAfter": {
+            "返信先の判定": [
+              "Succeeded",
+              "Failed",
+              "Skipped"
+            ]
+          },
+          "type": "OpenApiConnection",
+          "inputs": {
+            "parameters": {
+              "sourceFileId": "@triggerOutputs()?['headers/x-ms-file-id']",
+              "destinationFilePath": "/work/agent/reply/done/@{triggerOutputs()?['headers/x-ms-file-name']}",
+              "nameConflictBehavior": 1
+            },
+            "host": {
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_onedriveforbusiness",
+              "connectionName": "shared_onedriveforbusiness",
+              "operationId": "MoveFile"
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        }
+      },
+      "outputs": {}
+    },
+    "connectionReferences": {
+      "shared_teams": {
+        "connectionName": "shared-teams-33fb8072-9866-49ff-9827-eff9386aa7d6",
+        "source": "Embedded",
+        "id": "/providers/Microsoft.PowerApps/apis/shared_teams",
+        "tier": "NotSpecified",
+        "apiName": "teams",
+        "isProcessSimpleApiReferenceConversionAlreadyDone": false
+      },
+      "shared_onedriveforbusiness": {
+        "connectionName": "shared-onedriveforbu-20dc8025-ab3b-458e-9df4-0932c7c71290",
+        "source": "Embedded",
+        "id": "/providers/Microsoft.PowerApps/apis/shared_onedriveforbusiness",
+        "tier": "NotSpecified",
+        "apiName": "onedriveforbusiness",
+        "isProcessSimpleApiReferenceConversionAlreadyDone": false
+      }
+    },
+    "flowFailureAlertSubscribed": false,
+    "isManaged": false
+  }
+}

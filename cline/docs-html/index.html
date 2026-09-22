@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>概要 - AIエージェント基盤ドキュメント</title>
+<style>
+:root {
+  --bg: #F5F4F0; --surface: #FFFFFF; --border: #D3D1C7;
+  --text: #2C2C2A; --text-secondary: #5F5E5A; --text-muted: #888780;
+  --accent: #0C447C; --accent-bg: #E6F1FB;
+  --code-bg: #F1EFE8;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font-family: -apple-system, "Segoe UI", "Hiragino Sans", "Noto Sans JP", Meiryo, sans-serif;
+  line-height: 1.75; font-size: 15px;
+}
+.layout { display: flex; min-height: 100vh; }
+nav {
+  width: 220px; flex-shrink: 0; background: var(--surface);
+  border-right: 0.5px solid var(--border); padding: 24px 16px;
+  position: sticky; top: 0; height: 100vh; overflow-y: auto;
+}
+nav .brand { font-size: 13px; font-weight: 500; color: var(--text-secondary); margin: 0 8px 16px; }
+nav a {
+  display: block; padding: 8px; border-radius: 8px; color: var(--text);
+  text-decoration: none; font-size: 14px; margin-bottom: 2px;
+}
+nav a:hover { background: var(--code-bg); }
+nav a.active { background: var(--accent-bg); color: var(--accent); font-weight: 500; }
+main { flex: 1; min-width: 0; padding: 40px 48px; max-width: 900px; }
+h1, h2, h3 { font-weight: 500; line-height: 1.4; }
+h1 { font-size: 26px; margin: 0 0 20px; }
+h2 { font-size: 20px; margin: 40px 0 16px; padding-top: 8px; border-top: 0.5px solid var(--border); }
+h3 { font-size: 17px; margin: 28px 0 12px; }
+p { margin: 0 0 14px; }
+a { color: var(--accent); }
+img { max-width: 100%; height: auto; }
+table { border-collapse: collapse; width: 100%; margin: 0 0 20px; font-size: 14px; }
+th, td { border: 0.5px solid var(--border); padding: 8px 12px; text-align: left; vertical-align: top; }
+th { background: var(--code-bg); font-weight: 500; }
+code { background: var(--code-bg); border-radius: 4px; padding: 1px 6px; font-size: 13px;
+  font-family: "Consolas", "SF Mono", monospace; }
+pre { background: var(--code-bg); border-radius: 8px; padding: 16px; overflow-x: auto;
+  font-size: 13px; line-height: 1.6; }
+pre code { background: none; padding: 0; }
+blockquote { border-left: 3px solid var(--border); margin: 0 0 14px; padding: 4px 16px;
+  color: var(--text-secondary); }
+ul, ol { padding-left: 24px; margin: 0 0 14px; }
+li { margin-bottom: 4px; }
+hr { border: none; border-top: 0.5px solid var(--border); margin: 32px 0; }
+p[align="center"] { text-align: center; margin: 24px 0; }
+</style>
+</head>
+<body>
+<div class="layout">
+<nav><p class="brand">AIエージェント基盤</p><a href="index.html" class="active">概要</a><a href="01_architecture.html">1. アーキテクチャ</a><a href="02_setup.html">2. 導入手順</a><a href="03_power_automate.html">3. Power Automate</a><a href="04_operations.html">4. 運用</a><a href="05_verification.html">5. 動作確認</a></nav>
+<main>
+<h1 id="teams--power-automate--cline-aiエージェント開発基盤">Teams × Power Automate × Cline AIエージェント開発基盤</h1>
+<p>Teamsに依頼を書き込むと、GitHub Issueが立ち、Clineが実装し、
+検証用サイトで動作確認し、Teamsで承認するとmainへマージされてIssueが閉じる。
+この一連を<strong>Issueごとに並走</strong>させるための一式です。</p>
+<pre><code>Teams依頼
+   ↓ ① Power Automate
+request/*.json ──→ issue_agent.py ──→ GitHub Issue作成
+                                        ↓ state/issue-N.json (created)
+                                     orchestrator.py（並走制御）
+                                        ↓ Issue 1件につき1プロセス
+                                     implement_agent.py
+                                        ├ git worktree + feature/issue-N-xxx
+                                        ├ Clineへプロンプト投入
+                                        ├ 質問 → question/ → ③ → decision/ → Clineへ返す
+                                        ├ commit / push / ドラフトPR作成
+                                        ├ tools-beta へプレビュー公開
+                                        └ waiting/issue-N.json（承認待ち）
+                                                 ↓ ④ Power Automate（承認カード）
+                                           approval/issue-N.json
+                                                 ↓
+                                           approval_agent.py
+                                     ┌───────────┼───────────┐
+                                  承認         再実装         却下
+                                     ↓           ↓            ↓
+                             finish_agent.py  rework へ戻す  PRクローズ
+                             squash merge     （再度実装）    変更破棄
+                             Issueクローズ                    Issueクローズ
+                             プレビュー削除
+                             worktree削除
+</code></pre>
+<p>アクター（Teams / Power Automate / OneDrive / Python / Cline / GitHub）ごとに
+誰が何をしていて状態がどう変わるかは、
+<a href="01_architecture.html#アクター別の流れと状態">docs/01_architecture.md のスイムレーン図</a>を参照してください。</p>
+<h2 id="現状の弱点マップ">現状の弱点マップ</h2>
+<p>上の流れに、既知の設計上の弱点を重ねたものです。
+<strong>赤は今すぐ直すべき実バグ寄り、橙は設計そのものの論点、灰は運用しながらでよい改善</strong>です。</p>
+<p align="center">
+  <img src="images/flow-weaknesses.svg" alt="Teams依頼からマージまでの流れと設計上の弱点" width="680">
+</p>
+
+<p><strong>1・2・3・4・7・8は修正済みです</strong>（下表参照）。残る赤は無くなりました。
+入口（Teams依頼）と出口（承認・マージ）に残る橙・灰は、
+設計変更かPower Automate側の対応が必要なため未着手です。</p>
+<p>弱点1・4・3はかつて連鎖する経路でした。
+ウィンドウを取り違える → サマリーが作られないまま時間切れ → 変更なしでもコミット →
+CSSが欠けたプレビューで承認を求める、という流れです。
+1を直したことでこの連鎖の起点は消えていますが、3・4も独立に修正済みです。</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>弱点</th>
+<th>該当箇所</th>
+<th>対処</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>✅ ウィンドウ特定が部分一致</td>
+<td><code>agent_core/cline.py</code> <code>focus_window</code></td>
+<td>修正済み。数字境界つき正規表現 <code>(?&lt;!\d)issue-N(?!\d)</code> で照合</td>
+</tr>
+<tr>
+<td>2</td>
+<td>✅ <code>questionId</code> を照合していない</td>
+<td><code>implement_agent.py</code> <code>wait_for_decision</code></td>
+<td>修正済み。<code>questionId</code> 不一致の回答は破棄して待機継続</td>
+</tr>
+<tr>
+<td>3</td>
+<td>✅ プレビューが変更ファイルのみ</td>
+<td><code>deploy_preview.py</code> <code>copy_worktree_tree</code></td>
+<td>修正済み。worktree全体（<code>.git</code>除く）を配置するよう変更</td>
+</tr>
+<tr>
+<td>4</td>
+<td>✅ 完了判定のフォールバック</td>
+<td><code>implement_agent.py</code> <code>wait_for_implementation</code></td>
+<td>修正済み。フォールバック時は「未実施の確認」に警告を明示</td>
+</tr>
+<tr>
+<td>5</td>
+<td>GUI自動操作への依存</td>
+<td><code>agent_core/cline.py</code></td>
+<td>CLI型エージェントへ差し替え（<code>inject_prompt</code> のみ）</td>
+</tr>
+<tr>
+<td>6</td>
+<td>OneDriveをキューに使用</td>
+<td>全体</td>
+<td>SharePointリストかStorage Queueへ</td>
+</tr>
+<tr>
+<td>7</td>
+<td>✅ ロックがローカルPID基準</td>
+<td><code>agent_core/locks.py</code> <code>_reclaim_if_stale</code></td>
+<td>修正済み。ロックにホスト名を記録し、別ホストのロックは生死判定できないため自動回収しない。<code>agent_cli.py unlock</code> は別ホストのロックに <code>--force</code> を必須化</td>
+</tr>
+<tr>
+<td>8</td>
+<td>✅ マージ前の自動チェックなし</td>
+<td><code>finish_agent.py</code> <code>check_static</code></td>
+<td>修正済み。<code>agent_core/checks.py</code> でHTML対応・リンク切れを検査。<code>repo-templates/</code> にCI版も同梱</td>
+</tr>
+<tr>
+<td>9</td>
+<td>✅ 却下でIssueをクローズ</td>
+<td><code>finish_agent.py</code> <code>reject</code></td>
+<td>修正済み。openのまま <code>needs-rework</code> ラベルを付与。<code>agent_cli.py retry</code> でアーカイブから復元して再着手可能</td>
+</tr>
+<tr>
+<td>10</td>
+<td><code>GITHUB_TOKEN</code> が平文</td>
+<td><code>agent_core/ghcli.py</code></td>
+<td><code>gh issue create</code> に寄せてトークンを廃止</td>
+</tr>
+</tbody>
+</table>
+<p>図は <code>images/flow-weaknesses.svg</code>、生成スクリプトは <code>tools/build_svg.py</code> です。
+残る5・6・7・10を潰したら、該当行と図の色を更新してください。</p>
+<h2 id="主な設計判断">主な設計判断</h2>
+<table>
+<thead>
+<tr>
+<th>論点</th>
+<th>採用した方式</th>
+<th>理由</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>並走</td>
+<td>Issueごとに <code>git worktree</code></td>
+<td>同一リポジトリでブランチ切替の競合が起きない。Gitの標準機能。</td>
+</tr>
+<tr>
+<td>GUI競合</td>
+<td>「Clineへの貼り付け」だけロックで直列化</td>
+<td>実装・待機・承認は並走させつつ、GUIは1つしか無いという制約を守る</td>
+</tr>
+<tr>
+<td>分岐戦略</td>
+<td>GitHub Flow（<code>feature/issue-N-slug</code> → <code>main</code>）</td>
+<td>デファクトスタンダード。PRの <code>Closes #N</code> でIssueが自動クローズされる</td>
+</tr>
+<tr>
+<td>マージ</td>
+<td><code>gh pr merge --squash --delete-branch</code></td>
+<td>履歴が1Issue=1コミットで追いやすい。ブランチも自動削除</td>
+</tr>
+<tr>
+<td>動作確認</td>
+<td>tools-beta の <code>preview/issue-N/</code> に配置しGitHub Pagesで公開</td>
+<td>Issueごとにパスが分かれるので並走してもプレビューが混ざらない</td>
+</tr>
+<tr>
+<td>状態管理</td>
+<td><code>state/issue-N.json</code> を正本、工程フォルダは伝票</td>
+<td>途中でプロセスが落ちても状態から再開できる</td>
+</tr>
+<tr>
+<td>Teams通知</td>
+<td>Pythonは <code>reply/</code> へJSONを置くだけ</td>
+<td>PythonにTeams認証を持たせない。失敗時も再送できる</td>
+</tr>
+</tbody>
+</table>
+<h2 id="フォルダ構成">フォルダ構成</h2>
+<pre><code>ai-agent-system/
+├── agent/
+│   ├── agent_core/           共通モジュール
+│   │   ├── config.py         環境変数・パス定義
+│   │   ├── logs.py           ロガー
+│   │   ├── jsonio.py         OneDrive安全なJSON入出力・done退避
+│   │   ├── locks.py          ロック（デーモン/Issue/GUI）
+│   │   ├── statefile.py      状態機械
+│   │   ├── gitops.py         Git・worktree操作
+│   │   ├── ghcli.py          GitHub操作
+│   │   ├── teams.py          Teams通知（reply JSON出力）
+│   │   ├── cline.py          VS Code / Cline のGUI操作
+│   │   └── prompt.py         Clineプロンプト生成
+│   ├── issue_agent.py        ①request監視 → Issue作成
+│   ├── orchestrator.py       ②state監視 → 並走割り当て
+│   ├── implement_agent.py    ③Issue 1件分の実装ワーカー
+│   ├── deploy_preview.py     ④tools-betaへプレビュー公開
+│   ├── approval_agent.py     ⑤approval監視 → 振り分け
+│   ├── finish_agent.py       ⑥マージ・Issueクローズ
+│   ├── agent_cli.py          運用コマンド
+│   ├── tests/                自動テスト（pytest、133件）
+│   ├── requirements.txt
+│   └── requirements-dev.txt  テスト実行用（pytest）
+├── scripts/
+│   ├── setup.ps1             初期セットアップ
+│   ├── start_all.ps1         常駐3本の起動
+│   └── stop_all.ps1          停止
+├── powerautomate/
+│   ├── definitions/          フロー定義JSON
+│   ├── 04_reply_to_teams.zip インポート用パッケージ（新規）
+│   └── existing/             現行3フローのエクスポート
+├── docs/
+│   ├── 01_architecture.md    構成と状態遷移
+│   ├── 02_setup.md           導入手順
+│   ├── 03_power_automate.md  フロー設定
+│   ├── 04_operations.md      運用・トラブルシュート
+│   ├── 05_verification.md    実環境での動作確認チェックリスト
+│   └── images/               各ドキュメントの図（SVG）
+└── docs-html/                上記をブラウザで読む用に変換したHTML版（index.htmlから）
+</code></pre>
+<p><code>docs-html/</code> はブラウザでそのまま開けます（<code>docs-html/index.html</code> から）。
+Markdownを編集したら次で再生成してください。</p>
+<pre><code class="language-powershell">pip install markdown pymdown-extensions
+python tools\build_docs_html.py
+</code></pre>
+<h2 id="クイックスタート">クイックスタート</h2>
+<pre><code class="language-powershell"># 1. セットアップ（環境変数・フォルダ・依存パッケージ）
+powershell -ExecutionPolicy Bypass -File .\scripts\setup.ps1
+
+# 2. PowerShellを開き直してから点検
+python agent\agent_cli.py doctor
+
+# 3. Power Automate の4フローを設定（docs\03_power_automate.md）
+
+# 4. 常駐エージェントを起動
+powershell -ExecutionPolicy Bypass -File .\scripts\start_all.ps1 -Parallel 3
+
+# 5. Teamsの依頼チャネルへ投稿してみる
+</code></pre>
+<h2 id="自動テスト">自動テスト</h2>
+<p><code>agent/tests/</code> に pytest ベースの回帰テストがあります（133件）。
+実際のOneDrive・GitHub・Teamsには触れず、隔離された一時ディレクトリと
+ローカルのgitリポジトリだけで完結するので、開発機でそのまま実行できます。</p>
+<pre><code class="language-powershell">cd agent
+pip install -r requirements-dev.txt
+pytest
+</code></pre>
+<p>修正した実バグ（弱点1・2・3・4・7・8・9）にはそれぞれ対応する回帰テストがあります。
+コードを変更したら、コミット前に <code>pytest</code> を通してください。
+<code>gh</code> コマンドが必要な範囲（Issue作成・PR操作・マージ）はテスト対象外です。</p>
+<h2 id="動作確認の最小手順">動作確認の最小手順</h2>
+<pre><code class="language-powershell"># request を作らず、Issue番号を直接指定して実装ワーカーだけ動かす
+python agent\implement_agent.py 123 --manual
+
+# 承認せずにマージ処理だけ試す
+python agent\finish_agent.py 123 --approve
+
+# 状態を見る
+python agent\agent_cli.py status
+python agent\agent_cli.py show 123
+</code></pre>
+<p>詳細は <code>docs/</code> を参照してください。</p>
+</main>
+</div>
+</body>
+</html>

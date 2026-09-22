@@ -1,0 +1,190 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1056" viewBox="0 0 1080 1056" role="img">
+<title>アクター別スイムレーンと状態遷移</title>
+<desc>人とTeams、Power Automate、OneDrive、Python、Cline、GitHubの6アクターを列に取り、state/issue-N.json の状態ごとに誰が何をするかを上から下に並べた図。</desc>
+<rect x="0" y="0" width="1080" height="1056" fill="#FFFFFF"/>
+<text x="102" y="20" fill="#5F5E5A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500" text-anchor="middle">人 / Teams</text>
+<text x="277" y="20" fill="#5F5E5A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500" text-anchor="middle">Power Automate</text>
+<text x="452" y="20" fill="#5F5E5A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500" text-anchor="middle">OneDrive</text>
+<text x="627" y="20" fill="#5F5E5A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500" text-anchor="middle">Python</text>
+<text x="802" y="20" fill="#5F5E5A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500" text-anchor="middle">Cline</text>
+<text x="977" y="20" fill="#5F5E5A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500" text-anchor="middle">GitHub</text>
+<line x1="15" y1="30" x2="1065" y2="30" stroke="#5F5E5A" stroke-width="1"/>
+<rect x="15" y="30" width="1050" height="26" fill="#EEEDFE"/>
+<text x="27" y="47" fill="#3C3489" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">（状態なし） ・ 依頼が入る</text>
+<line x1="190" y1="56" x2="190" y2="120" stroke="#D3D1C7" stroke-width="0.5"/>
+<line x1="365" y1="56" x2="365" y2="120" stroke="#D3D1C7" stroke-width="0.5"/>
+<line x1="540" y1="56" x2="540" y2="120" stroke="#D3D1C7" stroke-width="0.5"/>
+<line x1="715" y1="56" x2="715" y2="120" stroke="#D3D1C7" stroke-width="0.5"/>
+<line x1="890" y1="56" x2="890" y2="120" stroke="#D3D1C7" stroke-width="0.5"/>
+<rect x="23" y="69" width="159" height="37" rx="6" fill="#FFFFFF" stroke="#B4B2A9" stroke-width="0.8"/>
+<text x="33" y="91" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">依頼を投稿</text>
+<rect x="198" y="62" width="159" height="52" rx="6" fill="#FFFFFF" stroke="#B4B2A9" stroke-width="0.8"/>
+<text x="208" y="84" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">投稿を検知</text>
+<text x="208" y="101" fill="#77766F" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="11" font-weight="400">1分間隔のポーリング</text>
+<rect x="373" y="69" width="159" height="37" rx="6" fill="#FFFFFF" stroke="#B4B2A9" stroke-width="0.8"/>
+<text x="383" y="91" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">request/</text>
+<rect x="15" y="120" width="1050" height="26" fill="#EEEDFE"/>
+<text x="27" y="137" fill="#3C3489" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">created ・ 着手待ち</text>
+<line x1="190" y1="146" x2="190" y2="210" stroke="#D3D1C7" stroke-width="0.5"/>
+<line x1="365" y1="146" x2="365" y2="210" stroke="#D3D1C7" stroke-width="0.5"/>
+<line x1="540" y1="146" x2="540" y2="210" stroke="#D3D1C7" stroke-width="0.5"/>
+<line x1="715" y1="146" x2="715" y2="210" stroke="#D3D1C7" stroke-width="0.5"/>
+<line x1="890" y1="146" x2="890" y2="210" stroke="#D3D1C7" stroke-width="0.5"/>
+<rect x="373" y="152" width="159" height="52" rx="6" fill="#FFFFFF" stroke="#B4B2A9" stroke-width="0.8"/>
+<text x="383" y="174" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">state/ に記録</text>
+<text x="383" y="191" fill="#77766F" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="11" font-weight="400">request → done</text>
+<rect x="548" y="152" width="159" height="52" rx="6" fill="#FFFFFF" stroke="#B4B2A9" stroke-width="0.8"/>
+<text x="558" y="174" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">issue_agent</text>
+<text x="558" y="191" fill="#77766F" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="11" font-weight="400">Message ID で重複排除</text>
+<rect x="898" y="152" width="159" height="52" rx="6" fill="#FFFFFF" stroke="#B4B2A9" stroke-width="0.8"/>
+<text x="908" y="174" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">Issue #12 を作成</text>
+<text x="908" y="191" fill="#77766F" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="11" font-weight="400">open</text>
+<rect x="15" y="210" width="1050" height="26" fill="#EEEDFE"/>
+<text x="27" y="227" fill="#3C3489" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">queued → implementing ・ 並走の起点</text>
+<line x1="190" y1="236" x2="190" y2="315" stroke="#D3D1C7" stroke-width="0.5"/>
+<line x1="365" y1="236" x2="365" y2="315" stroke="#D3D1C7" stroke-width="0.5"/>
+<line x1="540" y1="236" x2="540" y2="315" stroke="#D3D1C7" stroke-width="0.5"/>
+<line x1="715" y1="236" x2="715" y2="315" stroke="#D3D1C7" stroke-width="0.5"/>
+<line x1="890" y1="236" x2="890" y2="315" stroke="#D3D1C7" stroke-width="0.5"/>
+<rect x="548" y="242" width="159" height="67" rx="6" fill="#FFFFFF" stroke="#B4B2A9" stroke-width="0.8"/>
+<text x="558" y="264" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">orchestrator</text>
+<text x="558" y="281" fill="#77766F" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="11" font-weight="400">worktree を作成</text>
+<text x="558" y="296" fill="#77766F" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="11" font-weight="400">GUIロックを取得</text>
+<rect x="723" y="249" width="159" height="52" rx="6" fill="#FFFFFF" stroke="#B4B2A9" stroke-width="0.8"/>
+<text x="733" y="271" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">実装を開始</text>
+<text x="733" y="288" fill="#77766F" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="11" font-weight="400">プロンプトを受領</text>
+<rect x="898" y="249" width="159" height="52" rx="6" fill="#FFFFFF" stroke="#B4B2A9" stroke-width="0.8"/>
+<text x="908" y="271" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">ブランチを作成</text>
+<text x="908" y="288" fill="#77766F" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="11" font-weight="400">feature/issue-12-…</text>
+<rect x="15" y="315" width="1050" height="26" fill="#EEEDFE"/>
+<text x="27" y="332" fill="#3C3489" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">waiting_decision ・ 質問が Cline から Teams へ上がる</text>
+<line x1="190" y1="341" x2="190" y2="422" stroke="#D3D1C7" stroke-width="0.5"/>
+<line x1="365" y1="341" x2="365" y2="422" stroke="#D3D1C7" stroke-width="0.5"/>
+<line x1="540" y1="341" x2="540" y2="422" stroke="#D3D1C7" stroke-width="0.5"/>
+<line x1="715" y1="341" x2="715" y2="422" stroke="#D3D1C7" stroke-width="0.5"/>
+<line x1="890" y1="341" x2="890" y2="422" stroke="#D3D1C7" stroke-width="0.5"/>
+<rect x="23" y="363" width="159" height="37" rx="6" fill="#FFFFFF" stroke="#B4B2A9" stroke-width="0.8"/>
+<text x="33" y="385" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">選択して回答</text>
+<rect x="198" y="363" width="159" height="37" rx="6" fill="#FFFFFF" stroke="#B4B2A9" stroke-width="0.8"/>
+<text x="208" y="385" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">質問カードを投稿</text>
+<rect x="373" y="363" width="159" height="37" rx="6" fill="#FFFFFF" stroke="#B4B2A9" stroke-width="0.8"/>
+<text x="383" y="385" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">question/</text>
+<rect x="548" y="363" width="159" height="37" rx="6" fill="#FFFFFF" stroke="#B4B2A9" stroke-width="0.8"/>
+<text x="558" y="385" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">質問を転記</text>
+<rect x="723" y="347" width="159" height="69" rx="6" fill="#FFFFFF" stroke="#B4B2A9" stroke-width="0.8"/>
+<text x="733" y="369" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">.agent-question</text>
+<text x="733" y="386" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">.json を作成</text>
+<text x="733" y="403" fill="#77766F" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="11" font-weight="400">実装を停止</text>
+<rect x="15" y="422" width="1050" height="26" fill="#EEEDFE"/>
+<text x="27" y="439" fill="#3C3489" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">implementing ・ 回答が Teams から Cline へ戻る</text>
+<line x1="190" y1="448" x2="190" y2="527" stroke="#D3D1C7" stroke-width="0.5"/>
+<line x1="365" y1="448" x2="365" y2="527" stroke="#D3D1C7" stroke-width="0.5"/>
+<line x1="540" y1="448" x2="540" y2="527" stroke="#D3D1C7" stroke-width="0.5"/>
+<line x1="715" y1="448" x2="715" y2="527" stroke="#D3D1C7" stroke-width="0.5"/>
+<line x1="890" y1="448" x2="890" y2="527" stroke="#D3D1C7" stroke-width="0.5"/>
+<rect x="198" y="469" width="159" height="37" rx="6" fill="#FFFFFF" stroke="#B4B2A9" stroke-width="0.8"/>
+<text x="208" y="491" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">回答を書き出し</text>
+<rect x="373" y="469" width="159" height="37" rx="6" fill="#FFFFFF" stroke="#B4B2A9" stroke-width="0.8"/>
+<text x="383" y="491" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">decision/</text>
+<rect x="548" y="454" width="159" height="67" rx="6" fill="#FFFFFF" stroke="#B4B2A9" stroke-width="0.8"/>
+<text x="558" y="476" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">回答を投入</text>
+<text x="558" y="493" fill="#77766F" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="11" font-weight="400">question / decision</text>
+<text x="558" y="508" fill="#77766F" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="11" font-weight="400">を done へ退避</text>
+<rect x="723" y="461" width="159" height="52" rx="6" fill="#FFFFFF" stroke="#B4B2A9" stroke-width="0.8"/>
+<text x="733" y="483" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">実装を再開</text>
+<text x="733" y="500" fill="#77766F" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="11" font-weight="400">完了時にサマリー</text>
+<rect x="15" y="527" width="1050" height="26" fill="#EEEDFE"/>
+<text x="27" y="544" fill="#3C3489" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">preview_deploying → waiting_approval ・ 承認の材料を揃える</text>
+<line x1="190" y1="553" x2="190" y2="636" stroke="#D3D1C7" stroke-width="0.5"/>
+<line x1="365" y1="553" x2="365" y2="636" stroke="#D3D1C7" stroke-width="0.5"/>
+<line x1="540" y1="553" x2="540" y2="636" stroke="#D3D1C7" stroke-width="0.5"/>
+<line x1="715" y1="553" x2="715" y2="636" stroke="#D3D1C7" stroke-width="0.5"/>
+<line x1="890" y1="553" x2="890" y2="636" stroke="#D3D1C7" stroke-width="0.5"/>
+<rect x="548" y="559" width="159" height="71" rx="6" fill="#FFFFFF" stroke="#B4B2A9" stroke-width="0.8"/>
+<text x="558" y="581" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">commit / push</text>
+<text x="558" y="598" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">ドラフトPR作成</text>
+<text x="558" y="615" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">プレビュー公開</text>
+<rect x="898" y="568" width="159" height="52" rx="6" fill="#FFFFFF" stroke="#B4B2A9" stroke-width="0.8"/>
+<text x="908" y="590" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">PR #34 draft</text>
+<text x="908" y="607" fill="#77766F" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="11" font-weight="400">tools-beta Pages</text>
+<rect x="15" y="636" width="1050" height="26" fill="#EEEDFE"/>
+<text x="27" y="653" fill="#3C3489" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">waiting_approval ・ 承認カードが出る</text>
+<line x1="190" y1="662" x2="190" y2="741" stroke="#D3D1C7" stroke-width="0.5"/>
+<line x1="365" y1="662" x2="365" y2="741" stroke="#D3D1C7" stroke-width="0.5"/>
+<line x1="540" y1="662" x2="540" y2="741" stroke="#D3D1C7" stroke-width="0.5"/>
+<line x1="715" y1="662" x2="715" y2="741" stroke="#D3D1C7" stroke-width="0.5"/>
+<line x1="890" y1="662" x2="890" y2="741" stroke="#D3D1C7" stroke-width="0.5"/>
+<rect x="23" y="668" width="159" height="67" rx="6" fill="#FFFFFF" stroke="#B4B2A9" stroke-width="0.8"/>
+<text x="33" y="690" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">プレビューを確認</text>
+<text x="33" y="707" fill="#77766F" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="11" font-weight="400">承認 / 却下</text>
+<text x="33" y="722" fill="#77766F" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="11" font-weight="400">再実装 を選ぶ</text>
+<rect x="198" y="674" width="159" height="54" rx="6" fill="#FFFFFF" stroke="#B4B2A9" stroke-width="0.8"/>
+<text x="208" y="696" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">承認カードを投稿</text>
+<text x="208" y="713" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">結果を書き出し</text>
+<rect x="373" y="674" width="159" height="54" rx="6" fill="#FFFFFF" stroke="#B4B2A9" stroke-width="0.8"/>
+<text x="383" y="696" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">waiting/</text>
+<text x="383" y="713" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">approval/</text>
+<rect x="548" y="675" width="159" height="52" rx="6" fill="#FFFFFF" stroke="#B4B2A9" stroke-width="0.8"/>
+<text x="558" y="697" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">approval_agent</text>
+<text x="558" y="714" fill="#77766F" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="11" font-weight="400">3方向へ振り分け</text>
+<rect x="15" y="741" width="1050" height="26" fill="#EEEDFE"/>
+<text x="27" y="758" fill="#3C3489" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">approved → completed ・ 承認された場合</text>
+<line x1="190" y1="767" x2="190" y2="846" stroke="#D3D1C7" stroke-width="0.5"/>
+<line x1="365" y1="767" x2="365" y2="846" stroke="#D3D1C7" stroke-width="0.5"/>
+<line x1="540" y1="767" x2="540" y2="846" stroke="#D3D1C7" stroke-width="0.5"/>
+<line x1="715" y1="767" x2="715" y2="846" stroke="#D3D1C7" stroke-width="0.5"/>
+<line x1="890" y1="767" x2="890" y2="846" stroke="#D3D1C7" stroke-width="0.5"/>
+<rect x="23" y="779" width="159" height="54" rx="6" fill="#FFFFFF" stroke="#B4B2A9" stroke-width="0.8"/>
+<text x="33" y="801" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">スレッドに</text>
+<text x="33" y="818" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">完了通知が届く</text>
+<rect x="198" y="779" width="159" height="54" rx="6" fill="#FFFFFF" stroke="#B4B2A9" stroke-width="0.8"/>
+<text x="208" y="801" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">reply/ を投稿</text>
+<text x="208" y="818" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">done へ移動</text>
+<rect x="373" y="788" width="159" height="37" rx="6" fill="#FFFFFF" stroke="#B4B2A9" stroke-width="0.8"/>
+<text x="383" y="810" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">state/done/</text>
+<rect x="548" y="773" width="159" height="67" rx="6" fill="#FFFFFF" stroke="#B4B2A9" stroke-width="0.8"/>
+<text x="558" y="795" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">finish_agent</text>
+<text x="558" y="812" fill="#77766F" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="11" font-weight="400">worktree を削除</text>
+<text x="558" y="827" fill="#77766F" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="11" font-weight="400">プレビューを削除</text>
+<rect x="898" y="773" width="159" height="67" rx="6" fill="#FFFFFF" stroke="#B4B2A9" stroke-width="0.8"/>
+<text x="908" y="795" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">squash merge</text>
+<text x="908" y="812" fill="#77766F" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="11" font-weight="400">main へ反映</text>
+<text x="908" y="827" fill="#77766F" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="11" font-weight="400">Issue をクローズ</text>
+<rect x="15" y="846" width="1050" height="26" fill="#FAEEDA"/>
+<text x="27" y="863" fill="#633806" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">rework ・ 再実装が選ばれた場合は実装中へ戻る</text>
+<line x1="190" y1="872" x2="190" y2="951" stroke="#D3D1C7" stroke-width="0.5"/>
+<line x1="365" y1="872" x2="365" y2="951" stroke="#D3D1C7" stroke-width="0.5"/>
+<line x1="540" y1="872" x2="540" y2="951" stroke="#D3D1C7" stroke-width="0.5"/>
+<line x1="715" y1="872" x2="715" y2="951" stroke="#D3D1C7" stroke-width="0.5"/>
+<line x1="890" y1="872" x2="890" y2="951" stroke="#D3D1C7" stroke-width="0.5"/>
+<rect x="23" y="893" width="159" height="37" rx="6" fill="#FFFFFF" stroke="#BA7517" stroke-width="0.8"/>
+<text x="33" y="915" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">修正指示を入力</text>
+<rect x="373" y="893" width="159" height="37" rx="6" fill="#FFFFFF" stroke="#BA7517" stroke-width="0.8"/>
+<text x="383" y="915" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">waiting/done/</text>
+<rect x="548" y="878" width="159" height="67" rx="6" fill="#FFFFFF" stroke="#BA7517" stroke-width="0.8"/>
+<text x="558" y="900" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">rework へ戻す</text>
+<text x="558" y="917" fill="#77766F" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="11" font-weight="400">同じブランチ</text>
+<text x="558" y="932" fill="#77766F" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="11" font-weight="400">同じ worktree</text>
+<rect x="723" y="893" width="159" height="37" rx="6" fill="#FFFFFF" stroke="#BA7517" stroke-width="0.8"/>
+<text x="733" y="915" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">修正を実装</text>
+<rect x="898" y="885" width="159" height="52" rx="6" fill="#FFFFFF" stroke="#BA7517" stroke-width="0.8"/>
+<text x="908" y="907" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">PRへ追加コミット</text>
+<text x="908" y="924" fill="#77766F" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="11" font-weight="400">PRは自動更新</text>
+<rect x="15" y="951" width="1050" height="26" fill="#FCEBEB"/>
+<text x="27" y="968" fill="#791F1F" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">rejected ・ 却下された場合</text>
+<line x1="190" y1="977" x2="190" y2="1041" stroke="#D3D1C7" stroke-width="0.5"/>
+<line x1="365" y1="977" x2="365" y2="1041" stroke="#D3D1C7" stroke-width="0.5"/>
+<line x1="540" y1="977" x2="540" y2="1041" stroke="#D3D1C7" stroke-width="0.5"/>
+<line x1="715" y1="977" x2="715" y2="1041" stroke="#D3D1C7" stroke-width="0.5"/>
+<line x1="890" y1="977" x2="890" y2="1041" stroke="#D3D1C7" stroke-width="0.5"/>
+<rect x="23" y="990" width="159" height="37" rx="6" fill="#FFFFFF" stroke="#E24B4A" stroke-width="0.8"/>
+<text x="33" y="1012" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">却下通知が届く</text>
+<rect x="373" y="990" width="159" height="37" rx="6" fill="#FFFFFF" stroke="#E24B4A" stroke-width="0.8"/>
+<text x="383" y="1012" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">state/done/</text>
+<rect x="548" y="983" width="159" height="52" rx="6" fill="#FFFFFF" stroke="#E24B4A" stroke-width="0.8"/>
+<text x="558" y="1005" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">変更を破棄</text>
+<text x="558" y="1022" fill="#77766F" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="11" font-weight="400">worktree を削除</text>
+<rect x="898" y="983" width="159" height="52" rx="6" fill="#FFFFFF" stroke="#E24B4A" stroke-width="0.8"/>
+<text x="908" y="1005" fill="#2C2C2A" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="12" font-weight="500">PRをクローズ</text>
+<text x="908" y="1022" fill="#77766F" font-family="-apple-system,'Segoe UI','Hiragino Sans','Noto Sans JP',Meiryo,sans-serif" font-size="11" font-weight="400">ブランチを削除</text>
+</svg>

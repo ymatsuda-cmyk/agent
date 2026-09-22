@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>1. アーキテクチャ - AIエージェント基盤ドキュメント</title>
+<style>
+:root {
+  --bg: #F5F4F0; --surface: #FFFFFF; --border: #D3D1C7;
+  --text: #2C2C2A; --text-secondary: #5F5E5A; --text-muted: #888780;
+  --accent: #0C447C; --accent-bg: #E6F1FB;
+  --code-bg: #F1EFE8;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font-family: -apple-system, "Segoe UI", "Hiragino Sans", "Noto Sans JP", Meiryo, sans-serif;
+  line-height: 1.75; font-size: 15px;
+}
+.layout { display: flex; min-height: 100vh; }
+nav {
+  width: 220px; flex-shrink: 0; background: var(--surface);
+  border-right: 0.5px solid var(--border); padding: 24px 16px;
+  position: sticky; top: 0; height: 100vh; overflow-y: auto;
+}
+nav .brand { font-size: 13px; font-weight: 500; color: var(--text-secondary); margin: 0 8px 16px; }
+nav a {
+  display: block; padding: 8px; border-radius: 8px; color: var(--text);
+  text-decoration: none; font-size: 14px; margin-bottom: 2px;
+}
+nav a:hover { background: var(--code-bg); }
+nav a.active { background: var(--accent-bg); color: var(--accent); font-weight: 500; }
+main { flex: 1; min-width: 0; padding: 40px 48px; max-width: 900px; }
+h1, h2, h3 { font-weight: 500; line-height: 1.4; }
+h1 { font-size: 26px; margin: 0 0 20px; }
+h2 { font-size: 20px; margin: 40px 0 16px; padding-top: 8px; border-top: 0.5px solid var(--border); }
+h3 { font-size: 17px; margin: 28px 0 12px; }
+p { margin: 0 0 14px; }
+a { color: var(--accent); }
+img { max-width: 100%; height: auto; }
+table { border-collapse: collapse; width: 100%; margin: 0 0 20px; font-size: 14px; }
+th, td { border: 0.5px solid var(--border); padding: 8px 12px; text-align: left; vertical-align: top; }
+th { background: var(--code-bg); font-weight: 500; }
+code { background: var(--code-bg); border-radius: 4px; padding: 1px 6px; font-size: 13px;
+  font-family: "Consolas", "SF Mono", monospace; }
+pre { background: var(--code-bg); border-radius: 8px; padding: 16px; overflow-x: auto;
+  font-size: 13px; line-height: 1.6; }
+pre code { background: none; padding: 0; }
+blockquote { border-left: 3px solid var(--border); margin: 0 0 14px; padding: 4px 16px;
+  color: var(--text-secondary); }
+ul, ol { padding-left: 24px; margin: 0 0 14px; }
+li { margin-bottom: 4px; }
+hr { border: none; border-top: 0.5px solid var(--border); margin: 32px 0; }
+p[align="center"] { text-align: center; margin: 24px 0; }
+</style>
+</head>
+<body>
+<div class="layout">
+<nav><p class="brand">AIエージェント基盤</p><a href="index.html">概要</a><a href="01_architecture.html" class="active">1. アーキテクチャ</a><a href="02_setup.html">2. 導入手順</a><a href="03_power_automate.html">3. Power Automate</a><a href="04_operations.html">4. 運用</a><a href="05_verification.html">5. 動作確認</a></nav>
+<main>
+<h1 id="01-アーキテクチャ">01. アーキテクチャ</h1>
+<h2 id="1-全体像">1. 全体像</h2>
+<p>役割分担は次の通りです。</p>
+<table>
+<thead>
+<tr>
+<th>担当</th>
+<th>やること</th>
+<th>やらないこと</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Teams</td>
+<td>依頼の入力、質問への回答、承認/却下/再実装の判断</td>
+<td>状態の保持</td>
+</tr>
+<tr>
+<td>Power Automate</td>
+<td>TeamsとOneDriveの橋渡し（投稿↔JSON）</td>
+<td>業務ロジック、Git操作</td>
+</tr>
+<tr>
+<td>OneDrive</td>
+<td>工程間のデータ受け渡しと状態の保存</td>
+<td>処理</td>
+</tr>
+<tr>
+<td>Python</td>
+<td>業務ロジック、Git/GitHub操作、Cline制御</td>
+<td>Teams認証</td>
+</tr>
+<tr>
+<td>Cline (VS Code)</td>
+<td>コードの実装</td>
+<td>git操作、PR作成</td>
+</tr>
+<tr>
+<td>GitHub</td>
+<td>ブランチ・PR・レビュー・マージ・Issue管理</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p>Power AutomateとPythonの間は<strong>ファイルだけ</strong>でやり取りします。
+どちらかが止まってもJSONが残るので、再起動すれば続きから処理できます。</p>
+<h3 id="アクター別の流れと状態">アクター別の流れと状態</h3>
+<p>列がアクター、上から下が時間の流れです。
+色の帯が <code>state/issue-&lt;N&gt;.json</code> の <code>status</code>、カードがそのとき誰が何をしているかを表します。</p>
+<p align="center">
+  <img src="images/actor-swimlane.svg" alt="アクター別スイムレーンと状態遷移" width="1080">
+</p>
+
+<p>この図から読み取ってほしいのは次の3点です。</p>
+<p><strong>1. Python列がほぼ全ての帯に埋まっている</strong>
+業務ロジックをPythonへ集約した結果です。
+Power Automate列が飛び飛びなのは健全な状態で、
+ここにロジックが増え始めたら設計が崩れている合図です。</p>
+<p><strong>2. OneDrive列が必ず2アクターの間に挟まっている</strong>
+TeamsとPythonが直接つながっている行は1つもありません。
+だからどちらかが落ちてもJSONが残り、再起動で続きから流れます。</p>
+<p><strong>3. 質問と承認は4アクターを跨ぐ</strong>
+<code>waiting_decision</code> と <code>waiting_approval</code> は
+Cline → OneDrive → Power Automate → Teams と往復で8ホップします。
+Power Automateのポーリングが1分なので、質問1回で数分が消えます。
+体感速度のボトルネックはここです。</p>
+<p><code>rework</code> の帯では <strong>worktreeもブランチも同じものを使い回します</strong>。
+PRが自動更新されるので意図通りですが、再実装の回数に上限が無いため、
+同じブランチにコミットが積み上がる点には注意してください
+（squash mergeするので最終的な履歴は1コミットにまとまります）。</p>
+<p>図は <code>images/actor-swimlane.svg</code>、生成は <code>tools/build_swimlane_svg.py</code> です。</p>
+<h2 id="2-onedriveのフォルダ構成">2. OneDriveのフォルダ構成</h2>
+<pre><code>work/agent/
+├── request/     Teams投稿 → Power Automateが作成 → issue_agent が消費
+│   └── done/
+├── question/    Clineの質問 → Pythonが作成 → Power Automateが消費
+│   └── done/
+├── decision/    Teamsの回答 → Power Automateが作成 → Pythonが消費
+│   └── done/
+├── waiting/     実装完了 → Pythonが作成 → Power Automateが消費
+│   └── done/
+├── approval/    Teamsの承認結果 → Power Automateが作成 → Pythonが消費
+│   └── done/
+├── reply/       通知文 → Pythonが作成 → Power Automateが消費し投稿後doneへ
+│   └── done/
+├── state/       Issueごとの状態（正本）
+│   ├── done/        完了・却下したIssueの状態
+│   ├── locks/       ロックファイル
+│   ├── processed/   Teams Message ID の重複防止マーカー
+│   └── archive/
+└── logs/        エージェントのログ
+</code></pre>
+<p><strong>原則</strong>: 各フォルダのJSONは「その工程の伝票」です。
+消費したプロセスが責任をもって <code>done/</code> へ移動します。</p>
+<table>
+<thead>
+<tr>
+<th>フォルダ</th>
+<th>作る人</th>
+<th>消費して done へ移す人</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>request</td>
+<td>Power Automate ①</td>
+<td>issue_agent.py</td>
+</tr>
+<tr>
+<td>question</td>
+<td>implement_agent.py</td>
+<td>implement_agent.py（回答受領後）</td>
+</tr>
+<tr>
+<td>decision</td>
+<td>Power Automate ③</td>
+<td>implement_agent.py</td>
+</tr>
+<tr>
+<td>waiting</td>
+<td>implement_agent.py</td>
+<td>approval_agent.py / finish_agent.py</td>
+</tr>
+<tr>
+<td>approval</td>
+<td>Power Automate ③</td>
+<td>approval_agent.py</td>
+</tr>
+<tr>
+<td>reply</td>
+<td>Python各所</td>
+<td>Power Automate ④（投稿後）</td>
+</tr>
+</tbody>
+</table>
+<h2 id="3-状態機械">3. 状態機械</h2>
+<p><code>state/issue-&lt;N&gt;.json</code> の <code>status</code> が唯一の正です。</p>
+<pre><code>        (Teams投稿)
+             │
+             ▼
+        created ──────────────┐
+             │                │
+    orchestrator が拾う        │ retry
+             ▼                │
+         queued               │
+             │                │
+             ▼                │
+      implementing ◄──────────┤
+        │        ▲            │
+        │        │ 回答        │
+        ▼        │            │
+  waiting_decision            │
+        │                     │
+        ▼                     │
+  preview_deploying           │
+        │                     │
+        ▼                     │
+  waiting_approval            │
+     ┌──┼──┐                  │
+ 承認 │  │  │ 再実装 ─→ rework ┘
+     ▼  │  ▼
+ approved│ rejected
+     │   │     │
+     ▼   │     ▼
+ completed│  変更破棄・PRクローズ
+          │  Issueはopenのまま
+          │  needs-reworkラベル付与
+          └ 却下
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>status</th>
+<th>意味</th>
+<th>次に動くもの</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>created</code></td>
+<td>Issue作成済み・着手待ち</td>
+<td>orchestrator</td>
+</tr>
+<tr>
+<td><code>queued</code></td>
+<td>ワーカー起動予約</td>
+<td>implement_agent</td>
+</tr>
+<tr>
+<td><code>implementing</code></td>
+<td>Clineが実装中</td>
+<td>implement_agent</td>
+</tr>
+<tr>
+<td><code>waiting_decision</code></td>
+<td>Teamsへ質問し回答待ち</td>
+<td>Power Automate ③</td>
+</tr>
+<tr>
+<td><code>preview_deploying</code></td>
+<td>tools-betaへ公開中</td>
+<td>deploy_preview</td>
+</tr>
+<tr>
+<td><code>waiting_approval</code></td>
+<td>Teams承認待ち</td>
+<td>Power Automate ③</td>
+</tr>
+<tr>
+<td><code>approved</code></td>
+<td>承認済み・マージ処理中</td>
+<td>finish_agent</td>
+</tr>
+<tr>
+<td><code>rework</code></td>
+<td>差し戻し・再実装待ち</td>
+<td>orchestrator</td>
+</tr>
+<tr>
+<td><code>completed</code></td>
+<td>マージ＆クローズ完了</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>rejected</code></td>
+<td>却下。ブランチ/PRは破棄するが、<strong>GitHub Issue自体はopenのまま</strong> <code>needs-rework</code> ラベルを付けて残す</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>failed</code></td>
+<td>異常終了。<code>agent_cli.py retry</code> で戻せる</td>
+<td>人</td>
+</tr>
+</tbody>
+</table>
+<p><code>completed</code> と <code>rejected</code> になると <code>state/issue-N.json</code> は <code>state/done/</code> へ移動します。
+<code>rejected</code> はGitHub Issue側はopenのままなので、内容を見直して
+再着手したい場合は <code>agent_cli.py retry &lt;N&gt;</code> を実行してください
+（<code>state/done/</code> から state を復元し、<code>created</code> に戻します）。</p>
+<h2 id="4-並走の仕組み">4. 並走の仕組み</h2>
+<h3 id="41-作業ディレクトリの分離">4.1 作業ディレクトリの分離</h3>
+<pre><code>C:\repo\tools                  ... 本体クローン（mainを保持、worktreeの親）
+C:\repo\worktrees\issue-12     ... Issue #12（feature/issue-12-xxx）
+C:\repo\worktrees\issue-13     ... Issue #13（feature/issue-13-yyy）
+C:\repo\tools-beta             ... 検証用サイト
+</code></pre>
+<p><code>git worktree</code> を使うことで、1つのクローンから複数のブランチを
+同時にチェックアウトできます。<code>git checkout</code> の奪い合いが起きません。</p>
+<p>Clineとの制御ファイル（<code>.agent-question.json</code> 等）も各worktree直下に
+置かれるため、Issue間で混ざりません。ここが並走できるかどうかの分かれ目です。</p>
+<h3 id="42-同時実行数の制御">4.2 同時実行数の制御</h3>
+<p><code>orchestrator.py</code> が <code>AGENT_MAX_PARALLEL</code>（既定3）までの
+<code>implement_agent.py</code> 子プロセスを同時に走らせます。</p>
+<h3 id="43-guiclineの排他">4.3 GUI（Cline）の排他</h3>
+<p>VS Codeへの貼り付けは物理的に1つずつしかできません。
+そこで <code>state/locks/cline-gui.lock</code> による<strong>GUIロック</strong>を使い、
+貼り付けの瞬間だけ直列化します。</p>
+<pre><code>Issue #12 ─ worktree作成 ─[GUIロック]貼付[解放]─ Clineが実装中 ─ 承認待ち
+Issue #13 ──── worktree作成 ────────待機───[GUIロック]貼付[解放]─ 実装中
+</code></pre>
+<p>「実装中」「回答待ち」「承認待ち」は並走し、貼り付けだけが順番待ちになります。
+実運用では貼り付けは数秒なので、これで十分に並走します。</p>
+<p><strong>手動運用にする場合</strong>: <code>--manual</code> を付けるとクリップボードへコピーするだけになり、
+GUIロックも使いません。複数VS Codeを人が操作する運用に向きます。</p>
+<h3 id="44-その他のロック">4.4 その他のロック</h3>
+<table>
+<thead>
+<tr>
+<th>ロック</th>
+<th>ファイル</th>
+<th>目的</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>デーモン</td>
+<td><code>locks/&lt;agent&gt;.lock</code></td>
+<td>各常駐エージェントの二重起動防止</td>
+</tr>
+<tr>
+<td>Issue</td>
+<td><code>locks/issue-&lt;N&gt;.lock</code></td>
+<td>同一Issueの多重処理防止</td>
+</tr>
+<tr>
+<td>GUI</td>
+<td><code>locks/cline-gui.lock</code></td>
+<td>Cline貼り付けの直列化</td>
+</tr>
+<tr>
+<td>tools-beta</td>
+<td><code>locks/tools-beta.lock</code></td>
+<td>プレビューpushの競合防止</td>
+</tr>
+</tbody>
+</table>
+<p>いずれも所有プロセスのPIDを記録しており、プロセスが死んでいれば
+自動的に回収されます（stale lock対策）。</p>
+<h2 id="5-git運用github-flow">5. Git運用（GitHub Flow）</h2>
+<pre><code>main ──●────────────────────────●── (squash merge)
+        \                      /
+         ●──●──●  feature/issue-12-add-customer-api
+         実装  修正
+</code></pre>
+<ol>
+<li><code>origin/main</code> から <code>feature/issue-&lt;N&gt;-&lt;slug&gt;</code> を切る</li>
+<li>Clineが実装 → Pythonがコミット＆push</li>
+<li><strong>ドラフトPR</strong>を作成（本文に <code>Closes #N</code>）</li>
+<li>tools-beta で動作確認 → Teamsで承認</li>
+<li><code>gh pr ready</code> → <code>gh pr merge --squash --delete-branch</code></li>
+<li><code>Closes #N</code> によりIssueが自動クローズ</li>
+<li>プレビューとworktreeを削除</li>
+</ol>
+<p>再実装（rework）の場合は同じブランチへコミットを追加するため、
+PRは自動で更新されます。</p>
+<h2 id="6-検証環境tools-beta">6. 検証環境（tools-beta）</h2>
+<p>worktree全体（<code>.git</code> と <code>.agent-*</code> 制御ファイルを除く）を
+<code>preview/issue-&lt;N&gt;/</code> 以下へそのまま配置します。</p>
+<pre><code>tools-beta/
+└── preview/
+    ├── issue-12/                ← worktree全体をコピー（baseブランチ＋変更）
+    │   ├── index.html           ← サイト共通のトップページ（既存ファイル）
+    │   ├── shared/style.css     ← 変更していない共有CSS（そのまま存在）
+    │   └── customer/index.html  ← 今回変更されたファイル
+    └── issue-13/
+        └── ...
+</code></pre>
+<p><strong>変更ファイルだけをコピーしません。</strong> worktreeは既に
+「baseブランチ＋今回の変更」を含む完全なチェックアウトなので、
+ディレクトリ全体をそのまま配置すれば、mainへマージした後と同じ構成になります。
+以前は変更ファイルだけをコピーしていたため、変更したページが参照する
+既存の共有CSSや画像が欠落し、崩れた状態のまま承認判断をさせてしまう
+問題がありました（<code>deploy_preview.py</code> <code>copy_worktree_tree</code>）。</p>
+<p>公開URL: <code>https://&lt;owner&gt;.github.io/tools-beta/preview/issue-&lt;N&gt;/</code></p>
+<p>マージまたは却下の時点で <code>preview/issue-&lt;N&gt;/</code> は自動削除されます。</p>
+<h2 id="7-clineとのjson契約">7. ClineとのJSON契約</h2>
+<p>Clineには「チャットに書くだけでなくファイルを作る」ことを指示しています。
+ファイルはすべてworktree直下、UTF-8 BOMなしです。</p>
+<table>
+<thead>
+<tr>
+<th>ファイル</th>
+<th>作る側</th>
+<th>意味</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>.agent-question.json</code></td>
+<td>Cline</td>
+<td>人の判断が必要。作成後は実装を止める</td>
+</tr>
+<tr>
+<td><code>.agent-summary.json</code></td>
+<td>Cline</td>
+<td>実装完了報告。<strong>これの作成＝完了判定</strong></td>
+</tr>
+<tr>
+<td><code>.agent-rework.txt</code></td>
+<td>Python</td>
+<td>差し戻し時の修正指示</td>
+</tr>
+</tbody>
+</table>
+<p>これらは <code>.git/info/exclude</code> に自動登録され、コミット対象になりません。</p>
+<h3 id="agent-questionjson"><code>.agent-question.json</code></h3>
+<pre><code class="language-json">{
+  &quot;type&quot;: &quot;cline_question&quot;,
+  &quot;issueNumber&quot;: 12,
+  &quot;questionId&quot;: &quot;customer-api-source&quot;,
+  &quot;question&quot;: &quot;顧客データの取得元をどうしますか。&quot;,
+  &quot;choices&quot;: [
+    { &quot;id&quot;: &quot;choice_1&quot;, &quot;title&quot;: &quot;customer.json から読む&quot;, &quot;description&quot;: &quot;...&quot; },
+    { &quot;id&quot;: &quot;choice_2&quot;, &quot;title&quot;: &quot;既存APIを流用する&quot;,     &quot;description&quot;: &quot;...&quot; },
+    { &quot;id&quot;: &quot;choice_3&quot;, &quot;title&quot;: &quot;その他（カスタム回答）&quot;, &quot;description&quot;: &quot;...&quot; }
+  ]
+}
+</code></pre>
+<h3 id="agent-summaryjson"><code>.agent-summary.json</code></h3>
+<pre><code class="language-json">{
+  &quot;issueNumber&quot;: 12,
+  &quot;summaryText&quot;: &quot;Teams承認画面に表示する報告の全文&quot;,
+  &quot;implementation&quot;: [&quot;実装した内容&quot;],
+  &quot;verification&quot;: [&quot;実際に確認した内容&quot;],
+  &quot;notPerformed&quot;: [&quot;未実施の確認&quot;],
+  &quot;notes&quot;: [&quot;承認者への注意事項&quot;]
+}
+</code></pre>
+<p><code>verification</code> と <code>notPerformed</code> を分けているのは、
+「確認したつもり」をそのまま承認画面に出さないためです。</p>
+</main>
+</div>
+</body>
+</html>
