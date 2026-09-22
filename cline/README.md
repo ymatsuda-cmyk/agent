@@ -137,19 +137,28 @@ python tools\build_docs_html.py
 ## クイックスタート
 
 ```powershell
-# 1. セットアップ（環境変数・フォルダ・依存パッケージ）
+# 1. セットアップ（環境変数・フォルダ・専用venv・依存パッケージ）
 powershell -ExecutionPolicy Bypass -File .\scripts\setup.ps1
 
-# 2. PowerShellを開き直してから点検
+# 2. PowerShellを開き直し、このプロジェクト専用のvenvをアクティベートしてから点検
+#    （他プロジェクトのvenvがアクティベートされたままだと混線するので注意）
+.\.venv\Scripts\Activate.ps1
 python agent\agent_cli.py doctor
 
 # 3. Power Automate の4フローを設定（docs\03_power_automate.md）
 
-# 4. 常駐エージェントを起動
+# 4. 常駐エージェントを起動（同じvenvがアクティブな状態で）
 powershell -ExecutionPolicy Bypass -File .\scripts\start_all.ps1 -Parallel 3
 
 # 5. Teamsの依頼チャネルへ投稿してみる
 ```
+
+`start_all.ps1` は新しいPowerShellウィンドウを開いて常駐プロセスを
+起動しますが、`python` コマンドをそのまま使わず、このリポジトリの
+`.venv` 内の `python.exe` を**絶対パスで直接指定**して起動します。
+起動元シェルで別プロジェクトのvenvがアクティベートされていても、
+新しいウィンドウ側がそれを引き継ぐことはありません
+（手動でのアクティベートも不要です）。
 
 ## 自動テスト
 

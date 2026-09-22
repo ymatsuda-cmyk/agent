@@ -5,11 +5,21 @@
 .DESCRIPTION
     1. 環境変数を設定する（setx：ユーザー環境変数）
     2. OneDrive上の状態別フォルダとdoneフォルダを作成する
-    3. Pythonの依存パッケージをインストールする
+    3. このプロジェクト専用のPython仮想環境を作り、依存パッケージを入れる
     4. tools / tools-beta のクローンを確認する
+
+    仮想環境は既定でこのリポジトリ直下の .venv に作る。
+    「たまたま別プロジェクトのvenvがアクティベートされていた」ことに気づかず
+    そちらへ依存パッケージを入れてしまう事故（別の仮想環境を掴んで
+    常駐プロセスが二重に起動する等）を防ぐため、python.exe を
+    PATH上のもの任せにせず、このvenv内のものを明示して使う。
 
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File .\setup.ps1
+
+.EXAMPLE
+    # 既存の.venvを作り直したい場合
+    powershell -ExecutionPolicy Bypass -File .\setup.ps1 -RecreateVenv
 #>
 
 param(
@@ -20,8 +30,10 @@ param(
     [string]$TargetRepo    = "C:\repo\tools",
     [string]$BetaRepo      = "C:\repo\tools-beta",
     [string]$WorktreeRoot  = "C:\repo\worktrees",
+    [string]$VenvPath      = (Join-Path $PSScriptRoot "..\.venv"),
     [int]   $MaxParallel   = 3,
-    [switch]$SkipPip
+    [switch]$SkipPip,
+    [switch]$RecreateVenv
 )
 
 $ErrorActionPreference = "Stop"
@@ -87,14 +99,49 @@ New-Item -ItemType Directory -Force -Path $WorktreeRoot | Out-Null
 Write-Host "[OK] $WorktreeRoot"
 
 # ------------------------------------------------------------
-Write-Section "3. Python依存パッケージ"
+Write-Section "3. Python仮想環境と依存パッケージ"
 
 if ($SkipPip) {
     Write-Host "スキップしました。"
 } else {
+    $venvPython = Join-Path $VenvPath "Scripts\python.exe"
+
+    if ($RecreateVenv -and (Test-Path $VenvPath)) {
+        Write-Host "既存の仮想環境を削除します: $VenvPath"
+        Remove-Item -Recurse -Force $VenvPath
+    }
+
+    if (-not (Test-Path $venvPython)) {
+        Write-Host "仮想環境を作成します: $VenvPath"
+
+        # 「今アクティベートされている別プロジェクトのvenv」を誤って
+        # 参照しないよう、可能なら py ランチャーで素のPythonから作る。
+        # py が無い環境では python にフォールバックする
+        # （その場合でも python -m venv 自体は常に独立した新しい環境を作る
+        #   ので、作成そのものは安全）。
+        if (Get-Command py -ErrorAction SilentlyContinue) {
+            py -3 -m venv $VenvPath
+        } else {
+            python -m venv $VenvPath
+        }
+
+        if (-not (Test-Path $venvPython)) {
+            Write-Error "仮想環境の作成に失敗しました: $VenvPath"
+            exit 1
+        }
+    } else {
+        Write-Host "[OK] 既存の仮想環境を使用します: $VenvPath"
+    }
+
     $requirements = Join-Path $PSScriptRoot "..\agent\requirements.txt"
-    python -m pip install --upgrade pip
-    python -m pip install -r $requirements
+
+    # 常にこのvenv内のpython.exeをフルパスで指定する。
+    # 「python」とだけ書くと、実行時にPATH上の別のpython
+    # （＝アクティベート中の別プロジェクトのvenv）を拾ってしまう。
+    & $venvPython -m pip install --upgrade pip
+    & $venvPython -m pip install -r $requirements
+
+    Write-Host "[OK] 依存パッケージをインストールしました: $VenvPath"
 }
 
 # ------------------------------------------------------------
@@ -116,6 +163,19 @@ if (-not (Test-Path (Join-Path $BetaRepo ".git"))) {
 
 # ------------------------------------------------------------
 Write-Section "セットアップ完了"
-Write-Host "新しいPowerShellを開き直してから、次を実行してください。"
+
+$activateScript = Join-Path $VenvPath "Scripts\Activate.ps1"
+
+Write-Host "新しいPowerShellを開き直し、このプロジェクト専用の仮想環境を"
+Write-Host "アクティベートしてから作業してください。"
+Write-Host "（別プロジェクトのvenvがアクティベートされたままだと、"
+Write-Host "  依存パッケージやpythonの参照先が混線します。）"
+Write-Host ""
+Write-Host "    cd $(Split-Path $PSScriptRoot -Parent)"
+Write-Host "    $activateScript"
 Write-Host "    python agent\agent_cli.py doctor"
+Write-Host ""
+Write-Host "プロンプトの先頭に '(.venv)' と出ていること、"
+Write-Host "そのパスがこのプロジェクト（$(Split-Path $PSScriptRoot -Parent)）配下"
+Write-Host "であることを必ず確認してください。"
 Write-Host ""

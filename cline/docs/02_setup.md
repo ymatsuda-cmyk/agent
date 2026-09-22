@@ -17,6 +17,50 @@ gh auth login
 gh auth status
 ```
 
+### Python仮想環境について（重要）
+
+**このプロジェクト専用の仮想環境を必ず使ってください。**
+別プロジェクトの仮想環境がアクティベートされたまま `setup.ps1` や
+`pip install` を実行すると、依存パッケージがそちらに入ってしまい、
+`python` コマンドの参照先も混線します。実際に、別プロジェクトの
+仮想環境から常駐エージェントを誤って起動してしまい、このプロジェクトの
+常駐エージェントと二重に動作して `git` の状態を壊した事例があります
+（`docs/04_operations.md` 参照）。
+
+`scripts/setup.ps1` は、このリポジトリ直下に専用の `.venv` を
+自動で作り、以後の `pip install` は常にそのvenv内の `python.exe` を
+フルパスで指定して実行します。**手動で仮想環境をアクティベートしてから
+`setup.ps1` を実行する必要はありません**（むしろ、他プロジェクトの
+venvがアクティベートされたままでも、venv作成自体には影響しません）。
+
+セットアップ後は、必ずこのプロジェクトの `.venv` をアクティベートしてから
+`agent_cli.py` 等を実行してください。
+
+```powershell
+cd C:\repo\agent\cline   # このリポジトリのルート
+.\.venv\Scripts\Activate.ps1
+```
+
+プロンプトの先頭に `(.venv)` と出ますが、**それだけでは「どのプロジェクトの
+venvか」は分かりません。** 迷ったら次で確認してください。
+
+```powershell
+# 今アクティブなpythonの実体パスを確認する
+Get-Command python | Select-Object Source
+# このプロジェクトの .venv 配下になっているか（例: C:\repo\agent\cline\.venv\Scripts\python.exe）
+```
+
+既存の `.venv` を作り直したい場合は `-RecreateVenv` を付けます。
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\setup.ps1 -RecreateVenv
+```
+
+`scripts/start_all.ps1`（常駐エージェントの起動）は、このvenvの
+`python.exe` を絶対パスで直接指定して起動するため、起動元シェルの
+アクティベート状態に依存しません。手動で `agent_cli.py` 等を実行する
+ときだけ、上記のアクティベートを忘れないようにしてください。
+
 ### `.ps1` ファイルの文字コードについて（重要）
 
 `scripts/*.ps1` には日本語コメントが含まれています。

@@ -48,6 +48,38 @@ VS Codeウィンドウが増えて操作しづらい場合は、
 
 ## 3. よくあるトラブル
 
+### 別プロジェクトのvenvと混線し、常駐プロセスが二重起動する
+
+**症状**: `git worktree` が `main` を掴んだまま残っている、
+無関係なコミットが `feature/` の付かない古いブランチに紛れ込む、
+`agent_cli.py status` と実際のIssueの状態が食い違う。
+
+**原因**: `python` コマンドを何もパス指定せずに使うと、そのときPATH上に
+たまたまアクティベートされている**どのプロジェクトのvenvか**に依存します。
+別プロジェクトのvenvがアクティベートされたまま常駐エージェントを起動すると、
+気づかないままそちらのvenvから起動してしまい、**同じ `AGENT_ROOT` ・
+同じ `TARGET_REPO_PATH` を取り合う、もう1系統の常駐プロセス**が
+生まれます。両者は互いを認識できないため、ロックが正しく機能せず、
+`git checkout` の奪い合いやコミットの混入が起きます。
+
+**対策（このリポジトリでは対応済み）**:
+`scripts/setup.ps1` はプロジェクト専用の `.venv` を作り、
+`scripts/start_all.ps1` はその `python.exe` を絶対パスで直接起動するため、
+起動元シェルのアクティベート状態に依存しません。
+
+**既に混線してしまった場合の切り分け方**:
+
+```powershell
+# 今動いている全python.exeの実体パスを確認する
+Get-CimInstance Win32_Process -Filter "Name = 'python.exe'" | Select-Object ProcessId, CommandLine | Format-List
+```
+
+`issue_agent.py` / `orchestrator.py` / `approval_agent.py` が
+**2組以上**、あるいは**このプロジェクトの `.venv` 以外**から
+起動されていないか確認してください。見つかったら安全な方だけ残して
+`Stop-Process -Id <PID> -Force` で個別に停止し、その後
+`agent_cli.py unlock --force` でロックを掃除してください。
+
 ### `setup.ps1` / `start_all.ps1` / `stop_all.ps1` で無関係な構文エラーが大量に出る
 
 ```

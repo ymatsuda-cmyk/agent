@@ -15,7 +15,6 @@ from __future__ import annotations
 import argparse
 import html
 import re
-import shutil
 import signal
 import sys
 import threading
@@ -178,11 +177,7 @@ def _process_file_inner(path) -> None:
 
     source = read_json_when_ready(path)
     if source is None:
-        if not path.exists():
-            # 既にdoneへ退避済みのファイルに対する遅延イベント（OneDrive再同期など）。
-            LOGGER.info(f"処理済みのため無視します: {path.name}")
-        else:
-            LOGGER.warn(f"JSONを読み取れないためスキップします: {path.name}")
+        LOGGER.warn(f"JSONを読み取れないためスキップします: {path.name}")
         return
 
     text = extract_plain_text(source.get("message"))
@@ -213,27 +208,12 @@ def _process_file_inner(path) -> None:
     title = build_issue_title(text)
     body = build_issue_body(source, text)
 
-    # Issue作成・Teams通知はネットワークI/Oで時間がかかるため、その前に
-    # requestフォルダから退避しておく。OneDriveの遅延イベントが処理完了後に
-    # 届いても、ファイルが既に無いことで誤って「JSON不正」と扱われないようにする。
-    done_path = move_to_done(path)
-    if done_path is None:
-        cancel_reservation(message_id)
-        LOGGER.error(f"処理済みへの退避に失敗しました。ファイルは残します: {path.name}")
-        return
-
     LOGGER.info(f"Issue作成: {title}")
     issue = create_issue(title, body)
 
     if issue is None:
         cancel_reservation(message_id)
-        try:
-            shutil.move(str(done_path), str(path))
-            LOGGER.error("Issueの作成に失敗しました。ファイルをrequestへ戻しました。")
-        except OSError:
-            LOGGER.error(
-                f"Issueの作成に失敗し、ファイルの復元にも失敗しました: {done_path.name}"
-            )
+        LOGGER.error("Issueの作成に失敗しました。ファイルは残します。")
         return
 
     issue_number = int(issue["number"])
@@ -268,6 +248,7 @@ def _process_file_inner(path) -> None:
         logger=LOGGER,
     )
 
+    move_to_done(path)
     LOGGER.info(f"処理済みへ移動しました: {path.name}")
 
 

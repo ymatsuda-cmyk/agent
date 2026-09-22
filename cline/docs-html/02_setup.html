@@ -100,6 +100,37 @@ p[align="center"] { text-align: center; margin: 24px 0; }
 <pre><code class="language-powershell">gh auth login
 gh auth status
 </code></pre>
+<h3 id="python仮想環境について重要">Python仮想環境について（重要）</h3>
+<p><strong>このプロジェクト専用の仮想環境を必ず使ってください。</strong>
+別プロジェクトの仮想環境がアクティベートされたまま <code>setup.ps1</code> や
+<code>pip install</code> を実行すると、依存パッケージがそちらに入ってしまい、
+<code>python</code> コマンドの参照先も混線します。実際に、別プロジェクトの
+仮想環境から常駐エージェントを誤って起動してしまい、このプロジェクトの
+常駐エージェントと二重に動作して <code>git</code> の状態を壊した事例があります
+（<code>docs/04_operations.md</code> 参照）。</p>
+<p><code>scripts/setup.ps1</code> は、このリポジトリ直下に専用の <code>.venv</code> を
+自動で作り、以後の <code>pip install</code> は常にそのvenv内の <code>python.exe</code> を
+フルパスで指定して実行します。<strong>手動で仮想環境をアクティベートしてから
+<code>setup.ps1</code> を実行する必要はありません</strong>（むしろ、他プロジェクトの
+venvがアクティベートされたままでも、venv作成自体には影響しません）。</p>
+<p>セットアップ後は、必ずこのプロジェクトの <code>.venv</code> をアクティベートしてから
+<code>agent_cli.py</code> 等を実行してください。</p>
+<pre><code class="language-powershell">cd C:\repo\agent\cline   # このリポジトリのルート
+.\.venv\Scripts\Activate.ps1
+</code></pre>
+<p>プロンプトの先頭に <code>(.venv)</code> と出ますが、<strong>それだけでは「どのプロジェクトの
+venvか」は分かりません。</strong> 迷ったら次で確認してください。</p>
+<pre><code class="language-powershell"># 今アクティブなpythonの実体パスを確認する
+Get-Command python | Select-Object Source
+# このプロジェクトの .venv 配下になっているか（例: C:\repo\agent\cline\.venv\Scripts\python.exe）
+</code></pre>
+<p>既存の <code>.venv</code> を作り直したい場合は <code>-RecreateVenv</code> を付けます。</p>
+<pre><code class="language-powershell">powershell -ExecutionPolicy Bypass -File .\scripts\setup.ps1 -RecreateVenv
+</code></pre>
+<p><code>scripts/start_all.ps1</code>（常駐エージェントの起動）は、このvenvの
+<code>python.exe</code> を絶対パスで直接指定して起動するため、起動元シェルの
+アクティベート状態に依存しません。手動で <code>agent_cli.py</code> 等を実行する
+ときだけ、上記のアクティベートを忘れないようにしてください。</p>
 <h3 id="ps1-ファイルの文字コードについて重要"><code>.ps1</code> ファイルの文字コードについて（重要）</h3>
 <p><code>scripts/*.ps1</code> には日本語コメントが含まれています。
 <strong>Windows PowerShell 5.1</strong>（<code>powershell.exe</code>。<code>pwsh.exe</code> ではない方）は、

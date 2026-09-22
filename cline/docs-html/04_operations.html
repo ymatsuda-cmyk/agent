@@ -133,6 +133,30 @@ python agent\agent_cli.py clean-worktrees --remove-completed
 <p>VS Codeウィンドウが増えて操作しづらい場合は、
 <code>--no-vscode</code> で起動し、必要なときだけ人がworktreeを開く運用もできます。</p>
 <h2 id="3-よくあるトラブル">3. よくあるトラブル</h2>
+<h3 id="別プロジェクトのvenvと混線し常駐プロセスが二重起動する">別プロジェクトのvenvと混線し、常駐プロセスが二重起動する</h3>
+<p><strong>症状</strong>: <code>git worktree</code> が <code>main</code> を掴んだまま残っている、
+無関係なコミットが <code>feature/</code> の付かない古いブランチに紛れ込む、
+<code>agent_cli.py status</code> と実際のIssueの状態が食い違う。</p>
+<p><strong>原因</strong>: <code>python</code> コマンドを何もパス指定せずに使うと、そのときPATH上に
+たまたまアクティベートされている<strong>どのプロジェクトのvenvか</strong>に依存します。
+別プロジェクトのvenvがアクティベートされたまま常駐エージェントを起動すると、
+気づかないままそちらのvenvから起動してしまい、<strong>同じ <code>AGENT_ROOT</code> ・
+同じ <code>TARGET_REPO_PATH</code> を取り合う、もう1系統の常駐プロセス</strong>が
+生まれます。両者は互いを認識できないため、ロックが正しく機能せず、
+<code>git checkout</code> の奪い合いやコミットの混入が起きます。</p>
+<p><strong>対策（このリポジトリでは対応済み）</strong>:
+<code>scripts/setup.ps1</code> はプロジェクト専用の <code>.venv</code> を作り、
+<code>scripts/start_all.ps1</code> はその <code>python.exe</code> を絶対パスで直接起動するため、
+起動元シェルのアクティベート状態に依存しません。</p>
+<p><strong>既に混線してしまった場合の切り分け方</strong>:</p>
+<pre><code class="language-powershell"># 今動いている全python.exeの実体パスを確認する
+Get-CimInstance Win32_Process -Filter &quot;Name = 'python.exe'&quot; | Select-Object ProcessId, CommandLine | Format-List
+</code></pre>
+<p><code>issue_agent.py</code> / <code>orchestrator.py</code> / <code>approval_agent.py</code> が
+<strong>2組以上</strong>、あるいは<strong>このプロジェクトの <code>.venv</code> 以外</strong>から
+起動されていないか確認してください。見つかったら安全な方だけ残して
+<code>Stop-Process -Id &lt;PID&gt; -Force</code> で個別に停止し、その後
+<code>agent_cli.py unlock --force</code> でロックを掃除してください。</p>
 <h3 id="setupps1--start_allps1--stop_allps1-で無関係な構文エラーが大量に出る"><code>setup.ps1</code> / <code>start_all.ps1</code> / <code>stop_all.ps1</code> で無関係な構文エラーが大量に出る</h3>
 <pre><code>式またはステートメントのトークン '}' を使用できません。
 文字列に終端記号 &quot; がありません。
@@ -150,6 +174,25 @@ $content = Get-Content .\scripts\setup.ps1 -Raw -Encoding UTF8
     (New-Object System.Text.UTF8Encoding($true))
 )
 </code></pre>
+<h3 id="pytest-で無関係なテストが失敗する前のテストのissueが残っている"><code>pytest</code> で無関係なテストが失敗する（前のテストのIssueが残っている）</h3>
+<p><code>test_statefile.py</code> や <code>test_gitops.py</code> で、作った覚えのないIssue番号が
+状態に混ざっている・想定より多いテストが失敗する場合、テスト間の
+隔離が壊れています。まず次を実行し、どちらで失敗するか確認してください。</p>
+<pre><code class="language-powershell">pytest agent\tests\test_isolation_diagnostic.py -v
+</code></pre>
+<ul>
+<li><strong>2件とも通る</strong> → 単体では正しく隔離されている。他のテストファイルとの
+  組み合わせでのみ再現する可能性が高いので、<code>pytest agent -v</code> の完全な
+  出力をそのまま報告してください。</li>
+<li><strong><code>test_isolation_diagnostic_second</code> が失敗する</strong> → <code>agent_env</code>
+  フィクスチャ自体の隔離が機能していません。表示される
+  <code>AssertionError</code> のメッセージ全文（<code>CONFIG.agent_root</code> の期待値・実際値、
+  または既存Issueファイルの一覧）をそのまま報告してください。
+  原因を特定して修正します。</li>
+</ul>
+<p>これはWindows特有の環境要因（アンチウイルス、OneDrive同期、
+pytestやPythonのバージョンの組み合わせなど）が疑われますが、
+Linux環境では再現しておらず未特定です。</p>
 <h3 id="issueが二重に作られる">Issueが二重に作られる</h3>
 <ul>
 <li>①のTeams投稿JSONに <code>id</code>（Message ID）が入っているか確認する</li>
