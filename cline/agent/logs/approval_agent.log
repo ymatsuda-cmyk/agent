@@ -73,3 +73,33 @@
 [2026-09-22 06:54:13][approval_agent] Issue #5: 再実装が指示されました。
 [2026-09-22 06:54:13][approval_agent] 修正指示: 修正指示テキスト
 [2026-09-22 06:54:15][approval_agent] Teams通知JSON出力: issue-5-rework-20260922065415396643.json
+[2026-09-22 07:23:52][approval_agent][WARN] reworkCommentBase64をデコードできませんでした。
+[2026-09-22 07:23:52][approval_agent] Issue #1: 承認されました。マージ処理を開始します。
+[2026-09-22 07:23:53][approval_agent] Issue #2: 却下されました。
+[2026-09-22 07:23:53][approval_agent] Issue #3: 再実装が指示されました。
+[2026-09-22 07:23:53][approval_agent] 修正指示: ボタンの色を青に
+[2026-09-22 07:23:55][approval_agent] Teams通知JSON出力: issue-3-rework-20260922072355077633.json
+[2026-09-22 07:23:55][approval_agent] Issue #4: 再実装が指示されました。
+[2026-09-22 07:23:55][approval_agent] 修正指示: 1回目
+[2026-09-22 07:23:57][approval_agent] Teams通知JSON出力: issue-4-rework-20260922072357082500.json
+[2026-09-22 07:23:57][approval_agent] Issue #4: 再実装が指示されました。
+[2026-09-22 07:23:57][approval_agent] 修正指示: 2回目
+[2026-09-22 07:23:58][approval_agent] Teams通知JSON出力: issue-4-rework-20260922072358584541.json
+[2026-09-22 07:23:59][approval_agent] Issue #5: 再実装が指示されました。
+[2026-09-22 07:23:59][approval_agent] 修正指示: 修正指示テキスト
+[2026-09-22 07:24:00][approval_agent] Teams通知JSON出力: issue-5-rework-20260922072400590620.json
+[2026-09-22 07:24:34][approval_agent][WARN] reworkCommentBase64をデコードできませんでした。
+[2026-09-22 07:24:34][approval_agent] Issue #1: 承認されました。マージ処理を開始します。
+[2026-09-22 07:24:35][approval_agent] Issue #2: 却下されました。
+[2026-09-22 07:24:35][approval_agent] Issue #3: 再実装が指示されました。
+[2026-09-22 07:24:35][approval_agent] 修正指示: ボタンの色を青に
+[2026-09-22 07:24:36][approval_agent] Teams通知JSON出力: issue-3-rework-20260922072436914805.json
+[2026-09-22 07:24:37][approval_agent] Issue #4: 再実装が指示されました。
+[2026-09-22 07:24:37][approval_agent] 修正指示: 1回目
+[2026-09-22 07:24:38][approval_agent] Teams通知JSON出力: issue-4-rework-20260922072438920663.json
+[2026-09-22 07:24:38][approval_agent] Issue #4: 再実装が指示されました。
+[2026-09-22 07:24:38][approval_agent] 修正指示: 2回目
+[2026-09-22 07:24:40][approval_agent] Teams通知JSON出力: issue-4-rework-20260922072440422847.json
+[2026-09-22 07:24:40][approval_agent] Issue #5: 再実装が指示されました。
+[2026-09-22 07:24:40][approval_agent] 修正指示: 修正指示テキスト
+[2026-09-22 07:24:42][approval_agent] Teams通知JSON出力: issue-5-rework-20260922072442428295.json

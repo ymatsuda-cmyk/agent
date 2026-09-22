@@ -14,8 +14,10 @@ tmp_path 配下だけで完結したテストが書ける。
 from __future__ import annotations
 
 import pathlib
+import shutil
 import subprocess
 import sys
+import uuid
 
 import pytest
 
@@ -34,9 +36,22 @@ def run_git(args: list[str], cwd: pathlib.Path) -> subprocess.CompletedProcess:
 
 @pytest.fixture()
 def agent_env(tmp_path, monkeypatch):
-    """AGENT_ROOTや各リポジトリパスをtmp_path配下に隔離したCONFIGを用意する。"""
-    agent_root = tmp_path / "agent-root"
-    repo_dir = tmp_path / "repo"
+    """
+    AGENT_ROOTや各リポジトリパスをtmp_path配下に隔離したCONFIGを用意する。
+
+    Linux環境では tmp_path のみで完全に隔離できているが、
+    Windows + Python 3.14 の組み合わせで、テスト間にstateが漏れる現象が
+    報告されている（原因未特定）。念のため以下の対策を入れる。
+
+    1. uuid4 を挟んだサブフォルダにし、tmp_path の再利用/衝突の可能性を排除する
+    2. ensure_directories() の前に明示的に rmtree する（何か残っていても必ず空にする）
+    3. セットアップ直後に「本当に空か」を assert する。もしテスト間の漏れが
+       実在するなら、ここで即座に、分かりやすいエラーとして失敗する。
+       原因不明のまま後続テストが変な失敗をするより、ここで確実に検知したい。
+    """
+    unique = uuid.uuid4().hex[:8]
+    agent_root = tmp_path / f"agent-root-{unique}"
+    repo_dir = tmp_path / f"repo-{unique}"
 
     monkeypatch.setenv("GITHUB_TOKEN", "dummy-token-for-tests")
     monkeypatch.setenv("GITHUB_OWNER", "test-owner")
@@ -49,7 +64,23 @@ def agent_env(tmp_path, monkeypatch):
     monkeypatch.setenv("BASE_BRANCH", "main")
 
     CONFIG.__init__()  # 同じインスタンスの属性を、新しい環境変数で再構築する
+
+    assert CONFIG.agent_root == agent_root, (
+        f"CONFIG.agent_rootの再構築に失敗しました: "
+        f"期待={agent_root} 実際={CONFIG.agent_root}"
+    )
+
+    shutil.rmtree(agent_root, ignore_errors=True)  # 念のための明示的な事前クリーン
     CONFIG.ensure_directories()
+
+    existing_issues = list(CONFIG.state_dir.glob("issue-*.json"))
+    assert not existing_issues, (
+        "テスト隔離が壊れています。新規作成したはずのAGENT_ROOT "
+        f"({agent_root}) の state/ に、既にIssueファイルが存在します: "
+        f"{existing_issues}\n"
+        "これが出る場合、CONFIGのシングルトン再構築か、pytestのtmp_path隔離が"
+        "この環境で機能していません。このエラーメッセージをそのまま報告してください。"
+    )
 
     return CONFIG
 

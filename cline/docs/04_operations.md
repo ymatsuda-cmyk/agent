@@ -71,6 +71,29 @@ $content = Get-Content .\scripts\setup.ps1 -Raw -Encoding UTF8
 )
 ```
 
+### `pytest` で無関係なテストが失敗する（前のテストのIssueが残っている）
+
+`test_statefile.py` や `test_gitops.py` で、作った覚えのないIssue番号が
+状態に混ざっている・想定より多いテストが失敗する場合、テスト間の
+隔離が壊れています。まず次を実行し、どちらで失敗するか確認してください。
+
+```powershell
+pytest agent\tests\test_isolation_diagnostic.py -v
+```
+
+- **2件とも通る** → 単体では正しく隔離されている。他のテストファイルとの
+  組み合わせでのみ再現する可能性が高いので、`pytest agent -v` の完全な
+  出力をそのまま報告してください。
+- **`test_isolation_diagnostic_second` が失敗する** → `agent_env`
+  フィクスチャ自体の隔離が機能していません。表示される
+  `AssertionError` のメッセージ全文（`CONFIG.agent_root` の期待値・実際値、
+  または既存Issueファイルの一覧）をそのまま報告してください。
+  原因を特定して修正します。
+
+これはWindows特有の環境要因（アンチウイルス、OneDrive同期、
+pytestやPythonのバージョンの組み合わせなど）が疑われますが、
+Linux環境では再現しておらず未特定です。
+
 ### Issueが二重に作られる
 
 - ①のTeams投稿JSONに `id`（Message ID）が入っているか確認する

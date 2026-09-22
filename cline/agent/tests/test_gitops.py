@@ -57,8 +57,10 @@ def test_two_issues_get_independent_worktrees(git_repo):
     assert branch_a != branch_b
 
     result = gitops.git("worktree", "list", "--porcelain")
-    assert str(path_a) in result.stdout
-    assert str(path_b) in result.stdout
+    # gitは常にスラッシュ区切りで出力するが、Windowsでは str(Path) が
+    # バックスラッシュになるため、比較前に正規化する（as_posix）。
+    assert path_a.as_posix() in result.stdout.replace("\\", "/")
+    assert path_b.as_posix() in result.stdout.replace("\\", "/")
 
 
 def test_changed_files_lists_new_nested_files(git_repo):
@@ -127,4 +129,4 @@ def test_remove_worktree_cleans_up(git_repo):
 
     assert not path.exists()
     result = gitops.git("worktree", "list", "--porcelain")
-    assert str(path) not in result.stdout
+    assert path.as_posix() not in result.stdout.replace("\\", "/")
