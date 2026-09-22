@@ -100,6 +100,25 @@ p[align="center"] { text-align: center; margin: 24px 0; }
 <pre><code class="language-powershell">gh auth login
 gh auth status
 </code></pre>
+<h3 id="ps1-ファイルの文字コードについて重要"><code>.ps1</code> ファイルの文字コードについて（重要）</h3>
+<p><code>scripts/*.ps1</code> には日本語コメントが含まれています。
+<strong>Windows PowerShell 5.1</strong>（<code>powershell.exe</code>。<code>pwsh.exe</code> ではない方）は、
+UTF-8だがBOMが無いファイルを、UTF-8ではなくシステムのロケール
+（日本語Windowsなら Shift-JIS）で読み込もうとします。
+その結果、日本語部分が誤読され、</p>
+<pre><code>式またはステートメントのトークン '}' を使用できません。
+文字列に終端記号 &quot; がありません。
+</code></pre>
+<p>のような、一見無関係な構文エラーが連鎖して出ます。</p>
+<p>このリポジトリの <code>.ps1</code> ファイルは最初から <strong>UTF-8 with BOM</strong> で保存されているため、
+そのまま使う分には問題ありません。ただし、エディタで編集して保存し直すと
+BOMが失われることがあります（VS Codeは既定でBOM無し保存です）。
+編集した場合は、保存形式を「UTF-8 (BOM付き)」に指定し直してください。</p>
+<p>同じエラーが出た場合は、まずこれを疑ってください。</p>
+<pre><code class="language-powershell"># ファイルにBOMが付いているか確認する
+[System.IO.File]::ReadAllBytes(&quot;.\scripts\setup.ps1&quot;)[0..2] -join &quot;,&quot;
+# 239,187,191 ならBOM付き。それ以外ならBOM無し。
+</code></pre>
 <h2 id="2-githubの準備">2. GitHubの準備</h2>
 <h3 id="21-リポジトリ">2.1 リポジトリ</h3>
 <table>

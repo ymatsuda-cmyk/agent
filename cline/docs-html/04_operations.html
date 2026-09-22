@@ -133,6 +133,23 @@ python agent\agent_cli.py clean-worktrees --remove-completed
 <p>VS Codeウィンドウが増えて操作しづらい場合は、
 <code>--no-vscode</code> で起動し、必要なときだけ人がworktreeを開く運用もできます。</p>
 <h2 id="3-よくあるトラブル">3. よくあるトラブル</h2>
+<h3 id="setupps1--start_allps1--stop_allps1-で無関係な構文エラーが大量に出る"><code>setup.ps1</code> / <code>start_all.ps1</code> / <code>stop_all.ps1</code> で無関係な構文エラーが大量に出る</h3>
+<pre><code>式またはステートメントのトークン '}' を使用できません。
+文字列に終端記号 &quot; がありません。
+</code></pre>
+<p>のような、書き換えていない箇所でエラーが連鎖する場合、
+<code>.ps1</code> ファイルのBOMが失われています（<code>docs/02_setup.md</code> 参照）。
+Windows PowerShell 5.1 はBOM無しUTF-8を正しく読めず、
+日本語コメントを誤読して以降の構文解析が崩れます。
+エディタで保存し直した場合に起きやすい症状です。</p>
+<pre><code class="language-powershell"># UTF-8 (BOM付き) で保存し直す例
+$content = Get-Content .\scripts\setup.ps1 -Raw -Encoding UTF8
+[System.IO.File]::WriteAllText(
+    (Resolve-Path .\scripts\setup.ps1),
+    $content,
+    (New-Object System.Text.UTF8Encoding($true))
+)
+</code></pre>
 <h3 id="issueが二重に作られる">Issueが二重に作られる</h3>
 <ul>
 <li>①のTeams投稿JSONに <code>id</code>（Message ID）が入っているか確認する</li>

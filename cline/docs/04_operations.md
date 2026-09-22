@@ -48,6 +48,29 @@ VS Codeウィンドウが増えて操作しづらい場合は、
 
 ## 3. よくあるトラブル
 
+### `setup.ps1` / `start_all.ps1` / `stop_all.ps1` で無関係な構文エラーが大量に出る
+
+```
+式またはステートメントのトークン '}' を使用できません。
+文字列に終端記号 " がありません。
+```
+
+のような、書き換えていない箇所でエラーが連鎖する場合、
+`.ps1` ファイルのBOMが失われています（`docs/02_setup.md` 参照）。
+Windows PowerShell 5.1 はBOM無しUTF-8を正しく読めず、
+日本語コメントを誤読して以降の構文解析が崩れます。
+エディタで保存し直した場合に起きやすい症状です。
+
+```powershell
+# UTF-8 (BOM付き) で保存し直す例
+$content = Get-Content .\scripts\setup.ps1 -Raw -Encoding UTF8
+[System.IO.File]::WriteAllText(
+    (Resolve-Path .\scripts\setup.ps1),
+    $content,
+    (New-Object System.Text.UTF8Encoding($true))
+)
+```
+
 ### Issueが二重に作られる
 
 - ①のTeams投稿JSONに `id`（Message ID）が入っているか確認する
