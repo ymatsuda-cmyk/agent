@@ -131,3 +131,50 @@ def notify_rework(issue_number: int, comment: str, logger=None) -> None:
         ),
         logger=logger,
     )
+
+
+# ============================================================
+# 承認カードの内容と回答の返信
+# ============================================================
+
+ACTION_LABELS = {"approve": "承認", "reject": "却下", "rework": "再実装依頼"}
+
+DECISION_FIELDS = (
+    (None, "summaryText"),
+    ("実装内容", "implementationText"),
+    ("確認した内容", "verificationText"),
+    ("未実施の確認", "notPerformedText"),
+)
+
+
+def decision_sections(detail: dict, rework_comment: str = "") -> list[tuple[str | None, str]]:
+    """承認カードの内容を(見出し, 本文)の一覧に整形する。GitHubコメントと
+    Teams返信の両方で共用する。
+    """
+    sections: list[tuple[str | None, str]] = []
+    for heading, key in DECISION_FIELDS:
+        text = str(detail.get(key, "")).strip()
+        if text:
+            sections.append((heading, text))
+    if rework_comment:
+        sections.append(("修正指示", rework_comment))
+    return sections
+
+
+def notify_decision(
+    issue_number: int,
+    action: str,
+    detail: dict,
+    rework_comment: str = "",
+    logger=None,
+) -> None:
+    """承認/却下/再実装の結果と内容を、元のTeamsスレッドへ返信として残す。"""
+    label = ACTION_LABELS.get(action, action)
+    lines = [f"📋 Teams承認結果: {label}"]
+
+    for heading, text in decision_sections(detail, rework_comment):
+        if heading:
+            lines.append(f"\n{heading}:")
+        lines.append(text)
+
+    notify(issue_number, f"approval_{action}", "\n".join(lines), logger=logger)

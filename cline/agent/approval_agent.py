@@ -40,8 +40,6 @@ APPROVE_VALUES = {"approve", "approved", "ok", "yes", "承認"}
 REJECT_VALUES = {"reject", "rejected", "ng", "no", "却下"}
 REWORK_VALUES = {"rework", "redo", "再実装", "差し戻し"}
 
-ACTION_LABELS = {"approve": "承認", "reject": "却下", "rework": "再実装依頼"}
-
 _processing: set[str] = set()
 _processing_lock = threading.Lock()
 _shutdown = threading.Event()
@@ -77,24 +75,12 @@ def read_waiting_detail(issue_number: int) -> dict:
 
 def build_result_comment(action: str, detail: dict, rework_comment: str = "") -> str:
     """承認画面の内容と回答をIssueコメント用に整形する。"""
-    lines = [f"## Teams承認結果: {ACTION_LABELS.get(action, action)}"]
+    lines = [f"## Teams承認結果: {teams.ACTION_LABELS.get(action, action)}"]
 
-    for heading, key in (
-        (None, "summaryText"),
-        ("実装内容", "implementationText"),
-        ("確認した内容", "verificationText"),
-        ("未実施の確認", "notPerformedText"),
-    ):
-        text = str(detail.get(key, "")).strip()
-        if not text:
-            continue
+    for heading, text in teams.decision_sections(detail, rework_comment):
         if heading:
             lines.append(f"\n### {heading}")
         lines.append(text)
-
-    if action == "rework" and rework_comment:
-        lines.append("\n### 修正指示")
-        lines.append(rework_comment)
 
     return "\n".join(lines)
 
@@ -202,12 +188,21 @@ def _process_inner(path: pathlib.Path) -> None:
         move_to_done(path)
         return
 
+    # status_of()はstateが存在しない場合も空文字を返すため、
+    # 既にdoneへアーカイブ済み（=完了済み）のIssueへの二重承認を
+    # 見逃さないよう、state本体が無い場合はdoneの記録も確認する。
+    if not current and list((CONFIG.state_dir / "done").glob(f"issue-{issue_number}*.json")):
+        LOGGER.info(f"Issue #{issue_number} は既に完了しdoneへ退避済みのため処理しません。")
+        move_to_done(path)
+        return
+
     if action in ("approve", "reject", "rework"):
         rework_comment = decode_comment(data) if action == "rework" else ""
         detail = read_waiting_detail(issue_number)
         ghcli.comment_issue(
             issue_number, build_result_comment(action, detail, rework_comment)
         )
+        teams.notify_decision(issue_number, action, detail, rework_comment, logger=LOGGER)
 
     if action == "approve":
         handle_approve(issue_number)

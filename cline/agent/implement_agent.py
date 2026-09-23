@@ -524,12 +524,7 @@ class Worker:
                     stream.write(f"{name}\n")
 
     def ensure_draft_pr(self, summary: dict, changed_files: list[str]) -> tuple[int, str]:
-        """ドラフトPRを作る（既にあれば再利用する）。"""
-        existing = ghcli.find_open_pr(self.branch)
-        if existing:
-            self.log.info(f"既存PRを再利用します: #{existing['number']}")
-            return int(existing["number"]), str(existing["url"])
-
+        """ドラフトPRを作る（既にあれば本文を最新化して再利用する）。"""
         file_list = "\n".join(f"- `{path}`" for path in changed_files) or "- (変更なし)"
         implementation = "\n".join(
             f"- {item}" for item in summary.get("implementation", []) if item
@@ -567,6 +562,12 @@ class Worker:
 
 本PRはAIエージェントが作成しました。Teamsでの承認後に自動でマージされます。
 """
+
+        existing = ghcli.find_open_pr(self.branch)
+        if existing:
+            self.log.info(f"既存PRを再利用します: #{existing['number']}")
+            ghcli.update_pull_request_body(int(existing["number"]), body)
+            return int(existing["number"]), str(existing["url"])
 
         url = ghcli.create_pull_request(
             self.issue_number,

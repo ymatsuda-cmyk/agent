@@ -186,6 +186,15 @@ def create_pull_request(
     return urls[-1] if urls else ""
 
 
+def update_pull_request_body(pr_number: int, body: str) -> None:
+    """既存PRの本文を最新の実装内容で上書きする（reworkで再利用される際に使う）。"""
+    _gh(
+        "pr", "edit", str(pr_number),
+        "--repo", CONFIG.repository, "--body", body,
+        check=False,
+    )
+
+
 def merge_pull_request(
     pr_number: int,
     method: str = "squash",
