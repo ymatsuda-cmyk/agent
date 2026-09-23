@@ -50,7 +50,9 @@ def launch_vscode(
         return False
 
     subprocess.Popen(
-        [executable, "--new-window", str(worktree)],
+        # worktreeは毎回新規フォルダなので、信頼確認ダイアログが
+        # Clineの入力欄を塞いで自動投入が失敗するのを防ぐ。
+        [executable, "--new-window", "--disable-workspace-trust", str(worktree)],
         shell=True,
     )
 
@@ -172,8 +174,10 @@ def _focus_with_win32(pattern: re.Pattern[str], logger=None) -> bool:
         return False
 
     hwnd = found[0]
-    SW_RESTORE = 9
-    user32.ShowWindow(hwnd, SW_RESTORE)
+    # SW_RESTORE(9)は最大化状態を解除してしまうため、最大化を維持するために
+    # SW_MAXIMIZE(3)を使う（最小化からの復帰も兼ねる）。
+    SW_MAXIMIZE = 3
+    user32.ShowWindow(hwnd, SW_MAXIMIZE)
     user32.SetForegroundWindow(hwnd)
     time.sleep(WINDOW_FOCUS_WAIT_SECONDS)
 
