@@ -24,6 +24,8 @@ VSCODE_BOOT_WAIT_SECONDS = 25
 WINDOW_FOCUS_WAIT_SECONDS = 2
 CLINE_FOCUS_WAIT_SECONDS = 2
 PASTE_WAIT_SECONDS = 3
+CLIPBOARD_COPY_RETRIES = 3
+CLIPBOARD_COPY_RETRY_INTERVAL_SECONDS = 0.5
 
 
 # ============================================================
@@ -255,18 +257,41 @@ def _maximize_with_win32(pattern: re.Pattern[str], logger=None) -> bool:
 # プロンプト投入
 # ============================================================
 
-def copy_to_clipboard(text: str, logger=None) -> bool:
-    try:
-        import pyperclip
+def _set_cursor_pos(x: int, y: int) -> None:
+    """
+    pyautoguiを経由せずWin32 APIで直接カーソル位置を設定する。
 
-        pyperclip.copy(text)
-        if logger:
-            logger.info("プロンプトをクリップボードへコピーしました。")
-        return True
-    except Exception as error:
-        if logger:
-            logger.warn(f"クリップボードへのコピーに失敗しました: {error}")
-        return False
+    pyautoguiのフェイルセーフは「呼び出し時点のマウス位置」が
+    画面隅にあると誤発動するため、pyautogui呼び出しの前に
+    ここで目標座標へ動かしておくことで回避する。
+    """
+    try:
+        import ctypes
+
+        ctypes.windll.user32.SetCursorPos(int(x), int(y))
+    except Exception:
+        pass
+
+
+def copy_to_clipboard(text: str, logger=None) -> bool:
+    """他プロセスが一時的にOpenClipboardを握っていることがあるため、数回リトライする。"""
+    import pyperclip
+
+    last_error: Exception | None = None
+    for attempt in range(1, CLIPBOARD_COPY_RETRIES + 1):
+        try:
+            pyperclip.copy(text)
+            if logger:
+                logger.info("プロンプトをクリップボードへコピーしました。")
+            return True
+        except Exception as error:  # noqa: BLE001 - pyperclipは多様な例外を投げる
+            last_error = error
+            if attempt < CLIPBOARD_COPY_RETRIES:
+                time.sleep(CLIPBOARD_COPY_RETRY_INTERVAL_SECONDS)
+
+    if logger:
+        logger.warn(f"クリップボードへのコピーに失敗しました: {last_error}")
+    return False
 
 
 def inject_prompt(issue_number: int, prompt: str, logger=None) -> bool:
@@ -275,7 +300,8 @@ def inject_prompt(issue_number: int, prompt: str, logger=None) -> bool:
 
     呼び出し側で locks.gui_lock を取得していることを前提とする。
     """
-    copy_to_clipboard(prompt, logger)
+    if not copy_to_clipboard(prompt, logger):
+        return False
 
     if not focus_window(issue_number, logger):
         return False
@@ -289,6 +315,9 @@ def inject_prompt(issue_number: int, prompt: str, logger=None) -> bool:
 
     try:
         pyautogui.FAILSAFE = True
+        # マウスが画面隣に放置されているとpyautoguiのフェイルセーフが
+        # 誤発動するため、Win32 APIで先にカーソルを目標坐標へ移す。
+        _set_cursor_pos(CONFIG.cline_input_x, CONFIG.cline_input_y)
         pyautogui.click(CONFIG.cline_input_x, CONFIG.cline_input_y)
         time.sleep(CLINE_FOCUS_WAIT_SECONDS)
 
