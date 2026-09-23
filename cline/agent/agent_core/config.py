@@ -36,8 +36,8 @@ OPTIONAL_ENV_DEFAULTS: dict[str, str] = {
     "AGENT_GUI_MODE": "auto",          # auto | manual
     "AGENT_CLINE_INPUT_X": "1500",
     "AGENT_CLINE_INPUT_Y": "900",
-    "AGENT_CLINE_TAB_X": "0",
-    "AGENT_CLINE_TAB_Y": "0",
+    "AGENT_CLINE_TAB_X": "1240",
+    "AGENT_CLINE_TAB_Y": "50",
     "AGENT_IMPLEMENTATION_TIMEOUT": "1800",
     "AGENT_DECISION_TIMEOUT": "7200",
     "AGENT_GUI_LOCK_TIMEOUT": "1800",
