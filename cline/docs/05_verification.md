@@ -202,6 +202,21 @@ powershell -ExecutionPolicy Bypass -File .\scripts\start_all.ps1 -Parallel 2
 | 文字化けしていないか | 生成されたHTMLをブラウザで直接開く（日本語部分を目視） |
 | ログの異常終了 | `logs/issue-<N>.log` に `[ERROR]` が無いか |
 
+## 6.5 実環境での初回検証（Issue #68）で見つかったこと
+
+段階0〜3を実際にTeams/GitHub/Windows環境で通した際、2件の改善点が見つかり
+修正済み。同じ実行で再発しないか、念のため確認しておくとよい。
+
+- **Clineのチャットへ直接、途中終了を指示すると要約が空になることがある**
+  （`.agent-summary.json` の `implementation`/`verification` が空欄になる）。
+  `agent_core/prompt.py` の契約文を強化済み。承認カードの「未実施の確認」欄が
+  理由もなく空のまま届いた場合、これが起きている可能性がある
+  （`docs/01_architecture.md` 7章参照）。
+- **`mergedAt` 等のタイムスタンプにタイムゾーン表記が無く、GitHub APIの
+  UTC時刻（`mergedAt` フィールド、末尾Z）と並べたときに紛らわしかった**。
+  `agent_core/jsonio.py` の `now_iso()` を修正し、以後生成される
+  タイムスタンプは `+09:00` 等のオフセットを含む。
+
 ## 7. うまくいかなかったときの記録の仕方
 
 次の形式でまとめてもらえると、リモートでも原因を調査しやすくなります。

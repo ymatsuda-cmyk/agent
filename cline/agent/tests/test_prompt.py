@@ -94,6 +94,19 @@ def test_build_decision_prompt_falls_back_to_id_when_choice_unknown():
     assert "unknown_id" in text
 
 
+def test_summary_contract_instructs_reporting_even_on_early_stop():
+    """
+    実環境の検証で、チャットへ「これ以上の検証は不要です」と直接指示したところ、
+    Clineが implementation/verification を空欄のまま summaryText だけで
+    済ませてしまう事例があった。契約文にこれを防ぐ一文が含まれること。
+    """
+    text = prompt.build_implementation_prompt(
+        _sample_issue(), "b", "/w", "https://x/"
+    )
+    assert "打ち切る指示を受けた場合でも" in text
+    assert "実際に実施した内容を必ず記載" in text
+
+
 def test_control_files_do_not_include_summary_files_by_accident():
     assert prompt.QUESTION_FILE_NAME in prompt.CONTROL_FILES
     assert prompt.SUMMARY_FILE_NAME in prompt.CONTROL_FILES

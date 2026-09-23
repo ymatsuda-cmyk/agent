@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import shutil
 import subprocess
 import sys
@@ -176,6 +177,37 @@ def command_doctor(args) -> int:
 
     ok = True
 
+    # AGENT_ROOT / TARGET_REPO_PATH が未設定だと pathlib.Path("") が
+    # 暗黙的にカレントディレクトリを指してしまい、以降のフォルダ・
+    # リポジトリ存在チェックが「たまたま今いる場所に何かがある」ことを
+    # 理由に誤って[OK]になりうる。ここで先に明示的に検出する。
+    print("[必須環境変数]")
+    for name in ("GITHUB_TOKEN", "GITHUB_OWNER", "GITHUB_REPO", "AGENT_ROOT", "TARGET_REPO_PATH"):
+        value = os.environ.get(name, "").strip()
+        if value:
+            shown = f"{value[:4]}{'*' * 8}" if "TOKEN" in name else value
+            print(f"[OK] {name} = {shown}")
+        else:
+            print(f"[NG] {name} が未設定です")
+            ok = False
+
+    if not ok:
+        print()
+        print(
+            "必須環境変数が未設定のままです。この状態で他のコマンドを実行すると、"
+        )
+        print(
+            f"カレントディレクトリ（{Path('.').resolve()}）の直下に"
+        )
+        print("誤ってフォルダを作ってしまう可能性があります。")
+        print("scripts\\setup.ps1 を実行し、PowerShellを開き直してください。")
+        print()
+        print("=" * 60)
+        print("点検結果: 要対応（必須環境変数が未設定）")
+        print("=" * 60)
+        return 1
+
+    print()
     for command in ("git", "gh", "code", "python"):
         found = shutil.which(command) or shutil.which(f"{command}.cmd")
         print(f"{'[OK]' if found else '[NG]'} コマンド {command}: {found or '未検出'}")
@@ -258,6 +290,15 @@ def main() -> int:
 
     args = parser.parse_args()
 
+    if args.command == "doctor":
+        # doctorは「設定が壊れている状態」を見るための診断コマンド。
+        # ここでvalidate()（未設定なら強制終了）やensure_directories()
+        # （フォルダを実行前に作ってしまう）を先に通すと、
+        # 診断そのものが機能しなくなる（常に[OK]に見えてしまう）ため、
+        # 唯一この2つを呼ばずにそのまま実行する。
+        return args.func(args)
+
+    CONFIG.validate()
     CONFIG.ensure_directories()
     return args.func(args)
 

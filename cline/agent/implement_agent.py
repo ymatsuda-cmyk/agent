@@ -152,7 +152,7 @@ class Worker:
         ロック保持時間を短くするため、VS Codeの起動はロック外で行う。
         """
         if first_time and not self.args.no_vscode:
-            cline.launch_vscode(self.worktree, logger=self.log)
+            cline.launch_vscode(self.worktree, issue_number=self.issue_number, logger=self.log)
 
         if self.args.manual or CONFIG.gui_mode == "manual":
             cline.copy_to_clipboard(text, logger=self.log)

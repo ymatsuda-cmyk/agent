@@ -263,6 +263,20 @@ python agent\implement_agent.py &lt;Issue番号&gt; --manual
 </tr>
 </tbody>
 </table>
+<h2 id="65-実環境での初回検証issue-68で見つかったこと">6.5 実環境での初回検証（Issue #68）で見つかったこと</h2>
+<p>段階0〜3を実際にTeams/GitHub/Windows環境で通した際、2件の改善点が見つかり
+修正済み。同じ実行で再発しないか、念のため確認しておくとよい。</p>
+<ul>
+<li><strong>Clineのチャットへ直接、途中終了を指示すると要約が空になることがある</strong>
+  （<code>.agent-summary.json</code> の <code>implementation</code>/<code>verification</code> が空欄になる）。
+  <code>agent_core/prompt.py</code> の契約文を強化済み。承認カードの「未実施の確認」欄が
+  理由もなく空のまま届いた場合、これが起きている可能性がある
+  （<code>docs/01_architecture.md</code> 7章参照）。</li>
+<li><strong><code>mergedAt</code> 等のタイムスタンプにタイムゾーン表記が無く、GitHub APIの
+  UTC時刻（<code>mergedAt</code> フィールド、末尾Z）と並べたときに紛らわしかった</strong>。
+  <code>agent_core/jsonio.py</code> の <code>now_iso()</code> を修正し、以後生成される
+  タイムスタンプは <code>+09:00</code> 等のオフセットを含む。</li>
+</ul>
 <h2 id="7-うまくいかなかったときの記録の仕方">7. うまくいかなかったときの記録の仕方</h2>
 <p>次の形式でまとめてもらえると、リモートでも原因を調査しやすくなります。</p>
 <pre><code>■ 起きたこと

@@ -90,3 +90,30 @@ def test_move_to_done_avoids_name_collision(tmp_path):
 
 def test_move_to_done_missing_source_returns_none(tmp_path):
     assert jsonio.move_to_done(tmp_path / "no-such-file.json") is None
+
+
+def test_now_iso_includes_explicit_timezone_offset():
+    """
+    実環境の検証で、state の mergedAt（ローカル時刻・タイムゾーン無し）と
+    GitHub APIの mergedAt（UTC・Z付き）が並んだときに、どちらのタイムゾーン
+    か文字列だけでは分からず紛らわしいという指摘があった。
+    now_iso() は必ず明示的なオフセット（+09:00 等）を含むこと。
+    """
+    value = jsonio.now_iso()
+
+    # "YYYY-MM-DDTHH:MM:SS" の19文字より後ろに、
+    # "+HH:MM" / "-HH:MM" / "Z" のいずれかのタイムゾーン表記が続くこと
+    assert len(value) > 19
+    tz_part = value[19:]
+    assert tz_part.startswith(("+", "-", "Z")), (
+        f"タイムゾーン情報が付いていない: {value!r}"
+    )
+
+
+def test_now_iso_is_parseable_as_aware_datetime():
+    """fromisoformatで読み戻したときにtzinfoが付いている(=aware)こと。"""
+    from datetime import datetime
+
+    value = jsonio.now_iso()
+    parsed = datetime.fromisoformat(value)
+    assert parsed.tzinfo is not None

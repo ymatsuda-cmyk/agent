@@ -133,6 +133,31 @@ python agent\agent_cli.py clean-worktrees --remove-completed
 <p>VS Codeウィンドウが増えて操作しづらい場合は、
 <code>--no-vscode</code> で起動し、必要なときだけ人がworktreeを開く運用もできます。</p>
 <h2 id="3-よくあるトラブル">3. よくあるトラブル</h2>
+<h3 id="request-question-state-などのフォルダが意図しない場所リポジトリ直下などにできている"><code>request</code> <code>question</code> <code>state</code> などのフォルダが、意図しない場所（リポジトリ直下など）にできている</h3>
+<p><strong>症状</strong>: <code>AGENT_ROOT</code>（OneDrive上のはず）ではなく、
+<code>agent_cli.py</code> を実行したときのカレントディレクトリに
+<code>request/</code> <code>question/</code> <code>state/</code> 等が作られている。</p>
+<p><strong>原因（根本原因・修正済み）</strong>: <code>AGENT_ROOT</code> が未設定のとき、
+Pythonの <code>pathlib.Path("")</code> は例外にならず、<strong>暗黙的にカレント
+ディレクトリを指します。</strong> かつて <code>agent_cli.py</code> は、他のスクリプト
+（<code>issue_agent.py</code> 等）が必ず行っている環境変数チェック
+（<code>CONFIG.validate()</code>）を呼ばずに <code>CONFIG.ensure_directories()</code> を
+実行していたため、<code>AGENT_ROOT</code> の設定漏れに気づかないまま、
+実行時にいた場所へ静かにフォルダを作ってしまうことがありました。</p>
+<p><strong>対策（このリポジトリでは対応済み）</strong>:
+<code>agent_cli.py</code> は <code>doctor</code> 以外の全コマンドで、実行前に必ず
+<code>CONFIG.validate()</code> を通すようにしました。未設定なら、フォルダを
+作る前に明確なエラーで止まります。あわせて <code>CONFIG.ensure_directories()</code>
+自体にも二重の安全網を入れ、<code>validate()</code> の呼び忘れが今後どこかで
+あっても事故らないようにしています。<code>doctor</code> コマンドは診断のため
+あえてこのチェックを通さず、<code>[必須環境変数]</code> を最初に個別表示します。</p>
+<p><strong>既にできてしまったフォルダの後始末</strong>:</p>
+<pre><code class="language-powershell"># 中身が空、または明らかにこのプロジェクトのものだと確認できたら削除する
+cd C:\repo\agent\cline   # 意図せずフォルダができていた場所
+Remove-Item -Recurse -Force .\request, .\question, .\decision, .\waiting, .\approval, .\reply, .\state, .\logs -ErrorAction SilentlyContinue
+</code></pre>
+<p>削除前に、<code>waiting/</code> や <code>state/</code> に実際の作業内容（未承認のIssueの
+記録など）が入っていないか、中身を確認してください。</p>
 <h3 id="別プロジェクトのvenvと混線し常駐プロセスが二重起動する">別プロジェクトのvenvと混線し、常駐プロセスが二重起動する</h3>
 <p><strong>症状</strong>: <code>git worktree</code> が <code>main</code> を掴んだまま残っている、
 無関係なコミットが <code>feature/</code> の付かない古いブランチに紛れ込む、
@@ -157,6 +182,16 @@ Get-CimInstance Win32_Process -Filter &quot;Name = 'python.exe'&quot; | Select-O
 起動されていないか確認してください。見つかったら安全な方だけ残して
 <code>Stop-Process -Id &lt;PID&gt; -Force</code> で個別に停止し、その後
 <code>agent_cli.py unlock --force</code> でロックを掃除してください。</p>
+<h3 id="get-content-でログを見ると日本語が文字化けする"><code>Get-Content</code> でログを見ると日本語が文字化けする</h3>
+<p><code>.ps1</code> と同じ系統の問題です。<code>Get-Content</code> を <code>-Encoding</code> 指定無しで
+使うと、BOM無しのUTF-8ファイルをシステムのロケール（日本語Windowsなら
+Shift-JIS）で読もうとし、文字化けします。</p>
+<p><code>agent_core/logs.py</code> は、ログファイル作成時に先頭へBOMを付与するよう
+修正済みです（新しく作られるログファイルから有効。既存のログファイルは
+BOM無しのまま残ります）。それでも文字化けする場合は、次のいずれかで
+回避してください。</p>
+<pre><code class="language-powershell">Get-Content .\logs\issue-12.log -Encoding UTF8
+</code></pre>
 <h3 id="setupps1--start_allps1--stop_allps1-で無関係な構文エラーが大量に出る"><code>setup.ps1</code> / <code>start_all.ps1</code> / <code>stop_all.ps1</code> で無関係な構文エラーが大量に出る</h3>
 <pre><code>式またはステートメントのトークン '}' を使用できません。
 文字列に終端記号 &quot; がありません。
@@ -402,6 +437,10 @@ python agent\agent_cli.py retry 12
 <tr>
 <td>Cline以外のコーディングAI</td>
 <td><code>agent_core/cline.py</code> を差し替える（インターフェースは <code>inject_prompt</code> のみ）</td>
+</tr>
+<tr>
+<td>VS Codeが最大化されない</td>
+<td><code>code</code> CLIには最大化オプションが無いため、起動後にWin32 APIで明示的に最大化している（<code>cline.maximize_window</code>）。pywinauto/windllの無い環境では失敗し、前回のウィンドウサイズを引き継ぐ</td>
 </tr>
 <tr>
 <td>承認者を限定する</td>

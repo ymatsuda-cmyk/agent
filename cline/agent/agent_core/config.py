@@ -95,8 +95,19 @@ class Config:
         self.github_beta_repo = _env("GITHUB_BETA_REPO")
         self.base_branch = _env("BASE_BRANCH") or "main"
 
-        self.agent_root = pathlib.Path(_env("AGENT_ROOT"))
-        self.target_repo = pathlib.Path(_env("TARGET_REPO_PATH"))
+        # pathlib.Path("") は例外にならず、暗黙的にカレントディレクトリ
+        # ("." ) として解釈される。AGENT_ROOT / TARGET_REPO_PATH が
+        # 未設定のままこれを使うと、実行時のカレントディレクトリへ
+        # 気づかずフォルダを作ったり、無関係なgitリポジトリを操作したり
+        # する事故につながる。未設定だったかどうかを明示的に記録しておき、
+        # ensure_directories() 側で検知できるようにする。
+        raw_agent_root = _env("AGENT_ROOT")
+        raw_target_repo = _env("TARGET_REPO_PATH")
+        self._agent_root_was_set = bool(raw_agent_root)
+        self._target_repo_was_set = bool(raw_target_repo)
+
+        self.agent_root = pathlib.Path(raw_agent_root)
+        self.target_repo = pathlib.Path(raw_target_repo)
 
         beta_path = _env("BETA_REPO_PATH")
         self.beta_repo = (
@@ -164,7 +175,25 @@ class Config:
     # --------------------------------------------------------
 
     def ensure_directories(self) -> None:
-        """状態別フォルダとdone、管理フォルダを作成する。"""
+        """
+        状態別フォルダとdone、管理フォルダを作成する。
+
+        AGENT_ROOTが未設定のまま呼ばれると、pathlib.Path("")が
+        暗黙的にカレントディレクトリを指すため、実行時にたまたま
+        いた場所へフォルダを作ってしまう（原因が分かりにくい事故になる）。
+        これを未然に防ぐため、未設定なら明確なエラーで止める。
+        通常は各スクリプトのmain()がこれより先にvalidate()を呼ぶため
+        ここに到達しないが、呼び忘れがあっても事故らないための二重の安全網。
+        """
+        if not self._agent_root_was_set:
+            raise RuntimeError(
+                "AGENT_ROOT が設定されていません。このまま続けると、"
+                f"カレントディレクトリ（{pathlib.Path('.').resolve()}）の"
+                "直下にフォルダを作ってしまいます。\n"
+                "scripts\\setup.ps1 を実行するか、環境変数 AGENT_ROOT を"
+                "設定してから、PowerShellを開き直してください。"
+            )
+
         for folder_name in STATE_FOLDERS:
             directory = getattr(self, f"{folder_name}_dir")
             directory.mkdir(parents=True, exist_ok=True)

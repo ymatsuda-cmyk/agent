@@ -30,8 +30,18 @@ PASTE_WAIT_SECONDS = 3
 # VS Code 起動
 # ============================================================
 
-def launch_vscode(worktree: pathlib.Path, logger=None) -> bool:
-    """worktreeを新しいVS Codeウィンドウで開く。"""
+def launch_vscode(
+    worktree: pathlib.Path, issue_number: int | None = None, logger=None
+) -> bool:
+    """
+    worktreeを新しいVS Codeウィンドウで開く。
+
+    `code` CLIには「最大化して開く」オプションが無いため、
+    起動直後は前回のウィンドウサイズを引き継いだ小さい状態で
+    開くことがある。issue_number を渡すと、起動待ちの後に
+    そのウィンドウを見つけて最大化する（自動投入・手動投入どちらでも
+    見やすくするため）。見つからなくても致命的ではないので警告のみ。
+    """
     executable = shutil.which("code") or shutil.which("code.cmd")
 
     if not executable:
@@ -49,7 +59,28 @@ def launch_vscode(worktree: pathlib.Path, logger=None) -> bool:
         logger.info(f"起動完了まで {VSCODE_BOOT_WAIT_SECONDS} 秒待機します。")
 
     time.sleep(VSCODE_BOOT_WAIT_SECONDS)
+
+    if issue_number is not None:
+        maximize_window(issue_number, logger=logger)
+
     return True
+
+
+def maximize_window(issue_number: int, logger=None) -> bool:
+    """タイトルに issue-<N> を含むVS Codeウィンドウを最大化する。"""
+    pattern = _window_title_pattern(issue_number)
+
+    if _maximize_with_pywinauto(pattern, logger):
+        return True
+    if _maximize_with_win32(pattern, logger):
+        return True
+
+    if logger:
+        logger.warn(
+            f"Issue #{issue_number} のVS Codeウィンドウを最大化できませんでした"
+            "（見つからなかったか、非対応環境です）。"
+        )
+    return False
 
 
 # ============================================================
@@ -148,6 +179,71 @@ def _focus_with_win32(pattern: re.Pattern[str], logger=None) -> bool:
 
     if logger:
         logger.info("ウィンドウを前面化しました（Win32 API）。")
+    return True
+
+
+def _maximize_with_pywinauto(pattern: re.Pattern[str], logger=None) -> bool:
+    try:
+        from pywinauto import Desktop
+    except ImportError:
+        return False
+
+    try:
+        for window in Desktop(backend="uia").windows():
+            title = window.window_text() or ""
+            if pattern.search(title) and "Visual Studio Code" in title:
+                window.maximize()
+                time.sleep(WINDOW_FOCUS_WAIT_SECONDS)
+                if logger:
+                    logger.info(f"ウィンドウを最大化しました: {title}")
+                return True
+    except Exception as error:  # pywinautoは多様な例外を投げる
+        if logger:
+            logger.warn(f"pywinautoでの最大化に失敗しました: {error}")
+
+    return False
+
+
+def _maximize_with_win32(pattern: re.Pattern[str], logger=None) -> bool:
+    try:
+        import ctypes
+        from ctypes import wintypes
+    except ImportError:
+        return False
+
+    user32 = ctypes.windll.user32
+    found: list[int] = []
+
+    EnumWindowsProc = ctypes.WINFUNCTYPE(
+        wintypes.BOOL, wintypes.HWND, wintypes.LPARAM
+    )
+
+    def callback(hwnd, _lparam):
+        if not user32.IsWindowVisible(hwnd):
+            return True
+        length = user32.GetWindowTextLengthW(hwnd)
+        if length == 0:
+            return True
+        buffer = ctypes.create_unicode_buffer(length + 1)
+        user32.GetWindowTextW(hwnd, buffer, length + 1)
+        title = buffer.value
+        if pattern.search(title) and "Visual Studio Code" in title:
+            found.append(hwnd)
+            return False
+        return True
+
+    user32.EnumWindows(EnumWindowsProc(callback), 0)
+
+    if not found:
+        return False
+
+    hwnd = found[0]
+    SW_MAXIMIZE = 3
+    user32.ShowWindow(hwnd, SW_MAXIMIZE)
+    time.sleep(WINDOW_FOCUS_WAIT_SECONDS)
+
+    if logger:
+        logger.info("ウィンドウを最大化しました（Win32 API）。")
     return True
 
 

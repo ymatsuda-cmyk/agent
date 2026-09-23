@@ -48,6 +48,39 @@ VS Codeウィンドウが増えて操作しづらい場合は、
 
 ## 3. よくあるトラブル
 
+### `request` `question` `state` などのフォルダが、意図しない場所（リポジトリ直下など）にできている
+
+**症状**: `AGENT_ROOT`（OneDrive上のはず）ではなく、
+`agent_cli.py` を実行したときのカレントディレクトリに
+`request/` `question/` `state/` 等が作られている。
+
+**原因（根本原因・修正済み）**: `AGENT_ROOT` が未設定のとき、
+Pythonの `pathlib.Path("")` は例外にならず、**暗黙的にカレント
+ディレクトリを指します。** かつて `agent_cli.py` は、他のスクリプト
+（`issue_agent.py` 等）が必ず行っている環境変数チェック
+（`CONFIG.validate()`）を呼ばずに `CONFIG.ensure_directories()` を
+実行していたため、`AGENT_ROOT` の設定漏れに気づかないまま、
+実行時にいた場所へ静かにフォルダを作ってしまうことがありました。
+
+**対策（このリポジトリでは対応済み）**:
+`agent_cli.py` は `doctor` 以外の全コマンドで、実行前に必ず
+`CONFIG.validate()` を通すようにしました。未設定なら、フォルダを
+作る前に明確なエラーで止まります。あわせて `CONFIG.ensure_directories()`
+自体にも二重の安全網を入れ、`validate()` の呼び忘れが今後どこかで
+あっても事故らないようにしています。`doctor` コマンドは診断のため
+あえてこのチェックを通さず、`[必須環境変数]` を最初に個別表示します。
+
+**既にできてしまったフォルダの後始末**:
+
+```powershell
+# 中身が空、または明らかにこのプロジェクトのものだと確認できたら削除する
+cd C:\repo\agent\cline   # 意図せずフォルダができていた場所
+Remove-Item -Recurse -Force .\request, .\question, .\decision, .\waiting, .\approval, .\reply, .\state, .\logs -ErrorAction SilentlyContinue
+```
+
+削除前に、`waiting/` や `state/` に実際の作業内容（未承認のIssueの
+記録など）が入っていないか、中身を確認してください。
+
 ### 別プロジェクトのvenvと混線し、常駐プロセスが二重起動する
 
 **症状**: `git worktree` が `main` を掴んだまま残っている、
@@ -79,6 +112,21 @@ Get-CimInstance Win32_Process -Filter "Name = 'python.exe'" | Select-Object Proc
 起動されていないか確認してください。見つかったら安全な方だけ残して
 `Stop-Process -Id <PID> -Force` で個別に停止し、その後
 `agent_cli.py unlock --force` でロックを掃除してください。
+
+### `Get-Content` でログを見ると日本語が文字化けする
+
+`.ps1` と同じ系統の問題です。`Get-Content` を `-Encoding` 指定無しで
+使うと、BOM無しのUTF-8ファイルをシステムのロケール（日本語Windowsなら
+Shift-JIS）で読もうとし、文字化けします。
+
+`agent_core/logs.py` は、ログファイル作成時に先頭へBOMを付与するよう
+修正済みです（新しく作られるログファイルから有効。既存のログファイルは
+BOM無しのまま残ります）。それでも文字化けする場合は、次のいずれかで
+回避してください。
+
+```powershell
+Get-Content .\logs\issue-12.log -Encoding UTF8
+```
 
 ### `setup.ps1` / `start_all.ps1` / `stop_all.ps1` で無関係な構文エラーが大量に出る
 
@@ -277,6 +325,7 @@ python agent\agent_cli.py retry 12
 | CIの結果を承認カードに出す | `implement_agent.write_waiting()` に `gh pr checks` の結果を追加 |
 | 夜間だけ動かす | `orchestrator.py` を Windows タスクスケジューラで起動/停止 |
 | Cline以外のコーディングAI | `agent_core/cline.py` を差し替える（インターフェースは `inject_prompt` のみ） |
+| VS Codeが最大化されない | `code` CLIには最大化オプションが無いため、起動後にWin32 APIで明示的に最大化している（`cline.maximize_window`）。pywinauto/windllの無い環境では失敗し、前回のウィンドウサイズを引き継ぐ |
 | 承認者を限定する | Power Automate ③ のカードを承認者へのメンション付きにし、`data` に承認者名を含める |
 
 ## 7. 自動テスト

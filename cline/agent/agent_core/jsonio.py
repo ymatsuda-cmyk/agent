@@ -114,4 +114,15 @@ def move_to_done(path: pathlib.Path, done_dir: pathlib.Path | None = None) -> pa
 
 
 def now_iso() -> str:
-    return datetime.now().isoformat(timespec="seconds")
+    """
+    タイムゾーン付きのISO 8601文字列を返す（例: 2026-09-23T13:23:13+09:00）。
+
+    state/issue-<N>.json の createdAt/updatedAt/mergedAt 等、
+    システム全体のタイムスタンプはすべてこの関数を経由する。
+    以前は datetime.now() のみ（タイムゾーン情報なし）だったため、
+    GitHub APIが返す mergedAt（UTC、末尾Z付き）と並べたときに
+    どちらのタイムゾーンなのか一見して分からず、混同しやすかった。
+    .astimezone() でローカルのタイムゾーンオフセットを明示することで、
+    どのタイムゾーンの時刻かを文字列だけで判別できるようにする。
+    """
+    return datetime.now().astimezone().isoformat(timespec="seconds")

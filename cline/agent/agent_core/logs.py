@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import codecs
 import pathlib
 import sys
 import threading
@@ -32,6 +33,17 @@ class Logger:
             print(line, flush=True)
             if self.log_file is not None:
                 try:
+                    # Windows PowerShellの Get-Content は、BOMが無いUTF-8ファイルを
+                    # システムのロケール（日本語Windowsなら Shift-JIS）で読んでしまい、
+                    # 日本語ログが文字化けする（.ps1 と同じ系統の問題）。
+                    # ファイル作成時にだけ先頭へBOMを書き、それ以降は素のUTF-8で
+                    # 追記する（毎回 utf-8-sig で開くと、追記のたびにBOMが
+                    # ファイルの途中に挿入されて壊れるため、最初の1回だけにする）。
+                    is_new = not self.log_file.exists()
+                    if is_new:
+                        with self.log_file.open("wb") as raw:
+                            raw.write(codecs.BOM_UTF8)
+
                     with self.log_file.open("a", encoding="utf-8") as stream:
                         stream.write(line + "\n")
                 except OSError:
