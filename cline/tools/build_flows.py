@@ -205,7 +205,7 @@ flow04 = {
             "type": "OpenApiConnection",
             "inputs": {
                 "parameters": {
-                    "sourceFileId": "@triggerOutputs()?['headers/x-ms-file-id']",
+                    "id": "@triggerOutputs()?['headers/x-ms-file-id']",
                     "destinationFilePath": "/work/agent/reply/done/@{triggerOutputs()?['headers/x-ms-file-name']}",
                     "nameConflictBehavior": 1,
                 },
