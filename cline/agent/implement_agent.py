@@ -724,8 +724,20 @@ class Worker:
         if not self.prepare():
             return 1
 
+        # 前回セッションの質問(.agent-question.json)がまだ残っている場合、
+        # Clineのウィンドウ側ではその質問（ネイティブの追質問UIの場合もある）が
+        # 未回答のまま開いている可能性が高い。ここで初回プロンプトを再送すると、
+        # その未回答の質問へ誤って「実装してください」が回答として
+        # 貼り付けられてしまうため、再送せず質問処理を優先する。
+        resuming_question = None
         if self.args.mode == "new":
-            self.clear_control_files()
+            if self.question_file.exists():
+                resuming_question = self.read_question()
+            if resuming_question is not None:
+                self.archive_control_file(self.summary_file)
+                self.archive_control_file(self.rework_file)
+            else:
+                self.clear_control_files()
         else:
             # 再実装では rework 指示だけ残し、質問/サマリーは消す。
             self.archive_control_file(self.question_file)
@@ -735,7 +747,13 @@ class Worker:
             self.issue_number, self.issue["title"], self.branch, self.log
         )
 
-        self.send_to_cline(self.build_prompt(), first_time=True)
+        if resuming_question is None:
+            self.send_to_cline(self.build_prompt(), first_time=True)
+        else:
+            self.log.info(
+                "前回セッションの未回答の質問を検出しました。"
+                "実装プロンプトは再送せず、質問処理を継続します。"
+            )
 
         completion = self.wait_for_implementation()
         if not completion:
