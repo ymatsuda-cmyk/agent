@@ -315,6 +315,15 @@ def inject_prompt(issue_number: int, prompt: str, logger=None) -> bool:
 
     try:
         pyautogui.FAILSAFE = True
+
+        # チャット/Claude Codeなどとタブを共有している場合、起動直後は
+        # 別のタブがアクティブなことがある。Clineタブの座標が設定されて
+        # いれば、入力欄をクリックする前にそのタブへ切り替える。
+        if CONFIG.cline_tab_x and CONFIG.cline_tab_y:
+            _set_cursor_pos(CONFIG.cline_tab_x, CONFIG.cline_tab_y)
+            pyautogui.click(CONFIG.cline_tab_x, CONFIG.cline_tab_y)
+            time.sleep(CLINE_FOCUS_WAIT_SECONDS)
+
         # マウスが画面隣に放置されているとpyautoguiのフェイルセーフが
         # 誤発動するため、Win32 APIで先にカーソルを目標坐標へ移す。
         _set_cursor_pos(CONFIG.cline_input_x, CONFIG.cline_input_y)
@@ -365,6 +374,18 @@ def test_click(logger=None) -> bool:
         if logger:
             logger.error("pyautoguiが未インストールです。")
         return False
+
+    if CONFIG.cline_tab_x and CONFIG.cline_tab_y:
+        if logger:
+            logger.info(
+                f"5秒後に Clineタブ X={CONFIG.cline_tab_x}, Y={CONFIG.cline_tab_y} "
+                "をクリックします。"
+            )
+        time.sleep(5)
+        pyautogui.click(CONFIG.cline_tab_x, CONFIG.cline_tab_y)
+        time.sleep(1)
+        if logger:
+            logger.info("Clineタブがアクティブになっていれば座標は正しいです。")
 
     if logger:
         logger.info(

@@ -36,6 +36,8 @@ OPTIONAL_ENV_DEFAULTS: dict[str, str] = {
     "AGENT_GUI_MODE": "auto",          # auto | manual
     "AGENT_CLINE_INPUT_X": "1500",
     "AGENT_CLINE_INPUT_Y": "900",
+    "AGENT_CLINE_TAB_X": "0",
+    "AGENT_CLINE_TAB_Y": "0",
     "AGENT_IMPLEMENTATION_TIMEOUT": "1800",
     "AGENT_DECISION_TIMEOUT": "7200",
     "AGENT_GUI_LOCK_TIMEOUT": "1800",
@@ -127,6 +129,10 @@ class Config:
         self.gui_mode = _env("AGENT_GUI_MODE") or "auto"
         self.cline_input_x = _env_int("AGENT_CLINE_INPUT_X")
         self.cline_input_y = _env_int("AGENT_CLINE_INPUT_Y")
+        # チャット/Claude Codeなどとタブを共有している場合、起動直後は
+        # 別のタブがアクティブなことがある。未設定（0）ならタブクリックをスキップする。
+        self.cline_tab_x = _env_int("AGENT_CLINE_TAB_X")
+        self.cline_tab_y = _env_int("AGENT_CLINE_TAB_Y")
         self.implementation_timeout = _env_int("AGENT_IMPLEMENTATION_TIMEOUT")
         self.decision_timeout = _env_int("AGENT_DECISION_TIMEOUT")
         self.gui_lock_timeout = _env_int("AGENT_GUI_LOCK_TIMEOUT")
