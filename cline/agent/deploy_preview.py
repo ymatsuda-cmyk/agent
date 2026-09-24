@@ -171,7 +171,11 @@ def commit_and_push(beta_repo: pathlib.Path, message: str) -> bool:
     return True
 
 
-def build_preview_url(issue_number: int, changed_files: list[str]) -> str:
+def build_preview_url(
+    issue_number: int,
+    changed_files: list[str],
+    preview_root: pathlib.Path | None = None,
+) -> str:
     """
     プレビューURLを推測する。
 
@@ -179,19 +183,28 @@ def build_preview_url(issue_number: int, changed_files: list[str]) -> str:
     無ければ、Issue直下（プレビュールート）を返す。
     プレビュールートには、worktree全体コピーによりサイト本来の
     index.htmlが通常は既に存在している。
+
+    preview_root を渡した場合は、実際に配置済みのファイルだけを候補にする。
+    ファイル移動のIssueでは削除側（移動元）のパスも changed_files に含まれ、
+    そのディレクトリはプレビューに存在しないため404になる。
     """
     base = f"{CONFIG.pages_base_url}/{PREVIEW_ROOT}/issue-{issue_number}"
 
     for path in sorted(changed_files):
-        if path.lower().endswith("index.html"):
-            directory = "/".join(path.split("/")[:-1])
-            return f"{base}/{directory}/" if directory else f"{base}/"
+        normalized = path.replace("\\", "/")
+        if not normalized.lower().endswith("index.html"):
+            continue
+        if preview_root is not None and not (preview_root / normalized).exists():
+            continue
+        directory = "/".join(normalized.split("/")[:-1])
+        return f"{base}/{directory}/" if directory else f"{base}/"
 
     return f"{base}/"
 
 
 def deploy(issue_number: int, worktree: pathlib.Path, changed_files: list[str]) -> dict:
     beta_repo = ensure_beta_repo()
+    preview_root = beta_repo / PREVIEW_ROOT / f"issue-{issue_number}"
 
     copied = copy_worktree_tree(worktree, beta_repo, issue_number)
     if not copied:
@@ -215,7 +228,7 @@ def deploy(issue_number: int, worktree: pathlib.Path, changed_files: list[str]) 
 
     return {
         "status": "deployed" if pushed else "unchanged",
-        "issueNumber": issue_number,
+        "issueNumber": issue_number,, preview_root
         "previewUrl": build_preview_url(issue_number, changed_files),
         "files": changed_files,
     }

@@ -641,9 +641,13 @@ class Worker:
         base = f"{CONFIG.pages_base_url}/preview/issue-{self.issue_number}"
         for path in changed_files:
             normalized = path.replace("\\", "/")
-            if normalized.lower().endswith("index.html"):
-                directory = "/".join(normalized.split("/")[:-1])
-                return f"{base}/{directory}/".replace("//", "/").replace(":/", "://")
+            if not normalized.lower().endswith("index.html"):
+                continue
+            # 移動・削除された側のパスはプレビューに存在しないので候補から外す。
+            if not (self.worktree / normalized).exists():
+                continue
+            directory = "/".join(normalized.split("/")[:-1])
+            return f"{base}/{directory}/".replace("//", "/").replace(":/", "://")
         return f"{base}/"
 
     # --------------------------------------------------------

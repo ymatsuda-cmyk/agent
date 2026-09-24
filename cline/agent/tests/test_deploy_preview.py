@@ -96,6 +96,21 @@ def test_build_preview_url_falls_back_to_issue_root_when_no_index_changed():
     assert url.endswith("/issue-18/")
 
 
+def test_build_preview_url_skips_index_missing_from_preview(tmp_path):
+    # ファイル移動のIssue: 移動元(beta/shop)は削除済みでプレビューに存在しない
+    preview_root = tmp_path / "issue-18"
+    (preview_root / "shop").mkdir(parents=True)
+    (preview_root / "shop" / "index.html").write_text("<p>shop</p>", encoding="utf-8")
+
+    url = dp.build_preview_url(
+        18,
+        ["beta/shop/index.html", "shop/index.html"],
+        preview_root,
+    )
+
+    assert url.endswith("/issue-18/shop/")
+
+
 def test_deploy_full_flow_pushes_to_beta_repo(full_repo_env):
     worktree = _make_worktree(full_repo_env, 19)
     (worktree / "shop").mkdir()
