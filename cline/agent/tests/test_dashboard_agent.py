@@ -444,7 +444,7 @@ def test_js_routes_archived_issue_to_done_regardless_of_status():
 # リンク表示（Issue番号・PR番号・PR検索のフォールバック）
 # ============================================================
 
-def test_js_links_show_issue_and_pr_numbers():
+def test_js_links_show_issue_pr_and_preview():
     out = _run_js_logic(
         "REPOSITORY='owner/tools';"
         "const items=linkItems({number:68,issueUrl:'https://github.com/owner/tools/issues/68',"
@@ -452,7 +452,7 @@ def test_js_links_show_issue_and_pr_numbers():
         "previewUrl:'https://owner.github.io/tools-beta/preview/issue-68/'});"
         "console.log(items.map(i=>i.label).join('|'));"
     )
-    assert out == "Issue #68|PR #69|プレビュー"
+    assert out == "Issue|PR|プレビュー"
 
 
 def test_js_links_fall_back_to_pr_search_by_branch():
@@ -461,8 +461,8 @@ def test_js_links_fall_back_to_pr_search_by_branch():
         "const items=linkItems({number:62,branch:'issue-62-customer8'});"
         "console.log(items.map(i=>i.label+'='+i.url).join('|'));"
     )
-    assert "Issue #62=https://github.com/owner/tools/issues/62" in out
-    assert "PRを探す=https://github.com/owner/tools/pulls?q=is%3Apr%20head%3Aissue-62-customer8" in out
+    assert "Issue=https://github.com/owner/tools/issues/62" in out
+    assert "PR=https://github.com/owner/tools/pulls?q=is%3Apr%20head%3Aissue-62-customer8" in out
 
 
 def test_js_links_omit_pr_when_no_url_and_no_branch():
@@ -470,7 +470,7 @@ def test_js_links_omit_pr_when_no_url_and_no_branch():
         "REPOSITORY='owner/tools';"
         "console.log(linkItems({number:80}).map(i=>i.label).join('|'));"
     )
-    assert out == "Issue #80"
+    assert out == "Issue"
 
 
 # ============================================================

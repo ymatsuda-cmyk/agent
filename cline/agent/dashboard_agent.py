@@ -181,7 +181,7 @@ def build_dashboard_json(rows: list[tuple[int, dict]]) -> dict:
 # 公開済みの自動生成版は、次回の更新時に自動で置き換わる。
 # ============================================================
 
-AGENT_HTML_VERSION = 3
+AGENT_HTML_VERSION = 4
 _VERSION_META_NAME = "agent-dashboard-version"
 
 AGENT_HTML_TEMPLATE = """<!DOCTYPE html>
@@ -189,7 +189,7 @@ AGENT_HTML_TEMPLATE = """<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="agent-dashboard-version" content="3">
+<meta name="agent-dashboard-version" content="4">
 <title>Issue状態ダッシュボード</title>
 <style>
 * { box-sizing: border-box; }
@@ -211,11 +211,9 @@ h2 { font-size:14px; font-weight:500; margin:0 0 8px; color:#5F5E5A; }
 .card-title { font-weight:500; }
 .card-note { font-size:12px; margin-top:4px; }
 .card-meta { font-size:11px; color:#888780; margin-top:4px; }
-.links { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
-.links a { font-size:12px; color:#0C447C; text-decoration:none; background:#FFFFFF;
-  border:0.5px solid #B5D4F4; border-radius:6px; padding:3px 8px; }
-.links a:hover { background:#E6F1FB; }
-.links a.search { color:#5F5E5A; border-color:#D3D1C7; }
+.links { font-size:12px; margin-top:6px; }
+.links a { color:#0C447C; text-decoration:none; margin-right:12px; }
+.links a:hover { text-decoration:underline; }
 .empty { font-size:12px; color:#888780; padding:8px 0; }
 .warn { color:#A32D2D; font-weight:500; }
 .done { padding:0 20px 24px; }
@@ -327,22 +325,19 @@ function linkItems(issue) {
   const repoBase = REPOSITORY ? "https://github.com/" + REPOSITORY : "";
 
   const issueUrl = issue.issueUrl || (repoBase ? repoBase + "/issues/" + issue.number : "");
-  if (issueUrl) items.push({ label: "Issue #" + issue.number, url: issueUrl, cls: "" });
+  if (issueUrl) items.push({ label: "Issue", url: issueUrl });
 
   if (issue.pullRequestUrl) {
-    const m = String(issue.pullRequestUrl).match(new RegExp("/pull/([0-9]+)"));
-    const num = issue.pullRequestNumber || (m ? m[1] : "");
-    items.push({ label: num ? "PR #" + num : "PR", url: issue.pullRequestUrl, cls: "" });
+    items.push({ label: "PR", url: issue.pullRequestUrl });
   } else if (issue.branch && repoBase) {
-    // PRのURLが状態ファイルに無い場合は、ブランチ名でPRを検索するリンクにする
+    // PRのURLが状態ファイルに無い場合は、ブランチ名でPRを検索するページへ飛ぶ
     items.push({
-      label: "PRを探す",
-      url: repoBase + "/pulls?q=" + encodeURIComponent("is:pr head:" + issue.branch),
-      cls: "search"
+      label: "PR",
+      url: repoBase + "/pulls?q=" + encodeURIComponent("is:pr head:" + issue.branch)
     });
   }
 
-  if (issue.previewUrl) items.push({ label: "プレビュー", url: issue.previewUrl, cls: "" });
+  if (issue.previewUrl) items.push({ label: "プレビュー", url: issue.previewUrl });
   return items;
 }
 
@@ -350,8 +345,8 @@ function buildLinks(issue) {
   const items = linkItems(issue);
   if (!items.length) return "";
   return '<div class="links">' + items.map(function (it) {
-    return '<a class="' + it.cls + '" href="' + escapeHtml(it.url) + '" target="_blank" rel="noopener">' +
-      escapeHtml(it.label) + " ↗</a>";
+    return '<a href="' + escapeHtml(it.url) + '" target="_blank" rel="noopener">' +
+      escapeHtml(it.label) + "</a>";
   }).join("") + "</div>";
 }
 
