@@ -18,12 +18,33 @@ _write_lock = threading.Lock()
 
 
 class Logger:
-    def __init__(self, name: str, log_file: pathlib.Path | None = None) -> None:
-        self.name = name
-        self.log_file = log_file
+    """
+    ログファイルのパスを固定で覚えず、書き込みのたびに現在の
+    CONFIG.logs_dir を見に行く。
 
-        if self.log_file is not None:
-            self.log_file.parent.mkdir(parents=True, exist_ok=True)
+    以前は log_file をコンストラクタ時点で確定させていたため、
+    モジュール読み込み時（= main()がCONFIG.validate()を呼ぶ前）に
+    作られる LOGGER = get_logger(...) が、AGENT_ROOT未設定のまま
+    「たまたまその瞬間のカレントディレクトリ」を指すパスを永久に
+    覚えてしまう問題があった。テストではフィクスチャが後から
+    CONFIG を正しい一時ディレクトリへ再構築するが、既に出来上がった
+    Loggerはそれに追従できず、リポジトリ本体の agent/logs/ へ
+    書き込み続けるという実害が実際に発生していた。
+    """
+
+    def __init__(self, name: str, log_filename: str | None = None) -> None:
+        self.name = name
+        self.log_filename = log_filename
+
+    def _resolve_log_file(self) -> pathlib.Path | None:
+        if self.log_filename is None:
+            return None
+        # AGENT_ROOTが未設定のままだと CONFIG.logs_dir はカレント
+        # ディレクトリ相当になる。その場合はファイルへは書かず、
+        # コンソール出力だけにする（ログ関数自体が例外で落ちるのは避ける）。
+        if not CONFIG._agent_root_was_set:
+            return None
+        return CONFIG.logs_dir / self.log_filename
 
     def _emit(self, level: str, message: str) -> None:
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -31,20 +52,23 @@ class Logger:
 
         with _write_lock:
             print(line, flush=True)
-            if self.log_file is not None:
+            log_file = self._resolve_log_file()
+            if log_file is not None:
                 try:
+                    log_file.parent.mkdir(parents=True, exist_ok=True)
+
                     # Windows PowerShellの Get-Content は、BOMが無いUTF-8ファイルを
                     # システムのロケール（日本語Windowsなら Shift-JIS）で読んでしまい、
                     # 日本語ログが文字化けする（.ps1 と同じ系統の問題）。
                     # ファイル作成時にだけ先頭へBOMを書き、それ以降は素のUTF-8で
                     # 追記する（毎回 utf-8-sig で開くと、追記のたびにBOMが
                     # ファイルの途中に挿入されて壊れるため、最初の1回だけにする）。
-                    is_new = not self.log_file.exists()
+                    is_new = not log_file.exists()
                     if is_new:
-                        with self.log_file.open("wb") as raw:
+                        with log_file.open("wb") as raw:
                             raw.write(codecs.BOM_UTF8)
 
-                    with self.log_file.open("a", encoding="utf-8") as stream:
+                    with log_file.open("a", encoding="utf-8") as stream:
                         stream.write(line + "\n")
                 except OSError:
                     pass
@@ -70,17 +94,22 @@ class Logger:
 
 
 def get_logger(name: str, issue_number: int | None = None) -> Logger:
-    """エージェント名（と任意のIssue番号）からロガーを生成する。"""
-    CONFIG.logs_dir.mkdir(parents=True, exist_ok=True)
+    """
+    エージェント名（と任意のIssue番号）からロガーを生成する。
 
+    ディレクトリはここで確定させない（Loggerが書き込み時に
+    現在のCONFIGを見て解決する）。そのため、このモジュールが
+    main() より前に呼ばれても、AGENT_ROOT未設定によるカレント
+    ディレクトリ汚染は起きない。
+    """
     if issue_number is None:
-        log_file = CONFIG.logs_dir / f"{name}.log"
+        log_filename = f"{name}.log"
         display = name
     else:
-        log_file = CONFIG.logs_dir / f"issue-{issue_number}.log"
+        log_filename = f"issue-{issue_number}.log"
         display = f"{name}#{issue_number}"
 
-    return Logger(display, log_file)
+    return Logger(display, log_filename)
 
 
 def print_banner(title: str, rows: dict[str, object]) -> None:
