@@ -48,6 +48,58 @@ python agent\agent_cli.py clean-worktrees --remove-completed
 VS Codeウィンドウが増えて操作しづらい場合は、
 `--no-vscode` で起動し、必要なときだけ人がworktreeを開く運用もできます。
 
+## 2.5 Issue状態ダッシュボード（外出先からも確認したい場合）
+
+並走数が増えると、`agent_cli.py status` のテキスト出力だけでは
+「今どのIssueがどこで詰まっているか」を把握しづらくなります。
+`dashboard_agent.py` は、`state/` の変化を検知するたびに
+Issueの生データをJSONとして `tools-beta`（GitHub Pages）へ
+自動でpushし続けます。表示側は静的なHTML/JSアプリで、起動時と
+30秒ごとにこのJSONを取得してブラウザ側でカンバン表示を組み立てます。
+
+```powershell
+# 単体で起動する場合
+python agent\dashboard_agent.py
+
+# start_all.ps1 と同時に起動する場合
+powershell -ExecutionPolicy Bypass -File .\scripts\start_all.ps1 -Parallel 3 -Dashboard
+```
+
+公開先はプレビューと同じ `tools-beta` の別ディレクトリです。
+既存の `data/minutes/index.json` と同じ「`data/<用途>/`にJSONを置く」
+という、このリポジトリ自体の慣習に合わせています。
+
+```
+データ: tools-beta の data/agent/dashboard.json（更新のたびにpush）
+表示  : tools-beta の utility/agent.html（初回のみ作成。以降は固定）
+URL   : https://<owner>.github.io/tools-beta/utility/agent.html
+```
+
+この分離により、**HTML自体はほぼ動かず、以降のpushはJSONの差分だけ**
+になります。`utility/agent.html` を見た目やレイアウトの都合で
+手直ししても、次回以降のダッシュボード更新で上書きされません
+（`ensure_agent_html()` は既にあるファイルを上書きしない設計です）。
+
+このURLをスマホでブックマークしておけば、外出先や携帯回線からでも
+確認できます。ページはJavaScriptが30秒ごとにJSONを再取得して
+表示を更新するので、ページ全体の再読み込み（ちらつき）は起きません。
+
+**注意点**
+
+- `tools-beta` がGitHub上で公開リポジトリの場合、**このURLを知っていれば
+  誰でもIssueのタイトルや状態を閲覧できます**（既存のプレビューURLと
+  同じ公開範囲です）。社外に見せたくない情報が含まれる場合は、
+  `tools-beta` を非公開にするか、このスクリプト自体を使わない運用に
+  してください。
+- 反映には数十秒〜1、2分のタイムラグがあります（更新間隔30秒 ＋
+  GitHub Pagesのビルド時間）。厳密なリアルタイム性が必要な確認には
+  `agent_cli.py status` を直接使ってください。
+- `deploy_preview.py` と同じ `tools-beta` クローン・同じロックを
+  使うため、プレビュー公開中でも安全に共存します。
+- 承認待ち（`waiting_approval`）が2時間、質問回答待ち
+  （`waiting_decision`）が1時間を超えると、カードに「⚠ 放置」と
+  表示されます。
+
 ## 3. よくあるトラブル
 
 ### `request` `question` `state` などのフォルダが、意図しない場所（リポジトリ直下など）にできている
