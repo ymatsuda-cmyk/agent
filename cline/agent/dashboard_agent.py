@@ -86,7 +86,10 @@ def _collect_rows() -> list[tuple[int, dict]]:
                 number = int(data.get("issueNumber"))
             except (TypeError, ValueError):
                 continue
-            rows.append((number, data))
+            # state/done/ にあるものは、status の文字列が何であれ
+            # オーケストレーターの対象外（退避済み）。表示側で「対応待ち」等の
+            # 列に出さないよう印を付ける。
+            rows.append((number, {**data, "archived": True}))
 
     return rows
 
@@ -153,12 +156,16 @@ def build_dashboard_json(rows: list[tuple[int, dict]]) -> dict:
                 "issueUrl": data.get("issueUrl"),
                 "pullRequestUrl": data.get("pullRequestUrl"),
                 "previewUrl": data.get("previewUrl"),
+                "pullRequestNumber": data.get("pullRequestNumber"),
+                "branch": str(data.get("branch") or ""),
                 "pendingNotifications": _pending_notifications(issue_number),
+                "archived": bool(data.get("archived")),
             }
         )
 
     return {
         "generatedAt": _now_aware().isoformat(timespec="seconds"),
+        "repository": CONFIG.repository,
         "issues": issues,
     }
 
@@ -174,7 +181,7 @@ def build_dashboard_json(rows: list[tuple[int, dict]]) -> dict:
 # 公開済みの自動生成版は、次回の更新時に自動で置き換わる。
 # ============================================================
 
-AGENT_HTML_VERSION = 2
+AGENT_HTML_VERSION = 3
 _VERSION_META_NAME = "agent-dashboard-version"
 
 AGENT_HTML_TEMPLATE = """<!DOCTYPE html>
@@ -182,7 +189,7 @@ AGENT_HTML_TEMPLATE = """<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="agent-dashboard-version" content="2">
+<meta name="agent-dashboard-version" content="3">
 <title>Issue状態ダッシュボード</title>
 <style>
 * { box-sizing: border-box; }
@@ -204,12 +211,17 @@ h2 { font-size:14px; font-weight:500; margin:0 0 8px; color:#5F5E5A; }
 .card-title { font-weight:500; }
 .card-note { font-size:12px; margin-top:4px; }
 .card-meta { font-size:11px; color:#888780; margin-top:4px; }
-.links { font-size:11px; margin-top:6px; }
-.links a { color:#0C447C; text-decoration:none; margin-right:10px; }
+.links { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+.links a { font-size:12px; color:#0C447C; text-decoration:none; background:#FFFFFF;
+  border:0.5px solid #B5D4F4; border-radius:6px; padding:3px 8px; }
+.links a:hover { background:#E6F1FB; }
+.links a.search { color:#5F5E5A; border-color:#D3D1C7; }
 .empty { font-size:12px; color:#888780; padding:8px 0; }
 .warn { color:#A32D2D; font-weight:500; }
 .done { padding:0 20px 24px; }
-.done-row { display:flex; justify-content:space-between; gap:12px; font-size:13px; padding:8px 0; border-bottom:0.5px solid #D3D1C7; }
+.done-row { font-size:13px; padding:8px 0; border-bottom:0.5px solid #D3D1C7; }
+.done-head { display:flex; justify-content:space-between; gap:12px; }
+.done-row .links { margin-top:4px; }
 .done-row .meta { font-size:12px; color:#888780; white-space:nowrap; }
 </style>
 </head>
@@ -282,6 +294,10 @@ function classify(issue) {
   const pending = issue.pendingNotifications || {};
   const pendingAge = secondsSince(pending.oldestAt);
 
+  // 退避済み・完了済みは、未送信の通知が残っていても「終了」に回す
+  // （過去の通知ファイルの取り残しで、対応待ちの列が埋まるのを防ぐ）
+  if (issue.archived || TERMINAL.includes(status)) return { actor: "done" };
+
   if (pending.count > 0 && pendingAge != null && pendingAge >= PA_STALE_SECONDS) {
     return {
       actor: "pa",
@@ -289,8 +305,6 @@ function classify(issue) {
       warn: formatElapsed(pendingAge).replace("前", "") + " 滞留"
     };
   }
-
-  if (TERMINAL.includes(status)) return { actor: "done" };
 
   const entry = STATUS_MAP[status] || ["system", issue.statusLabel || status, null, ""];
   const age = secondsSince(issue.updatedAt);
@@ -306,12 +320,39 @@ function byUpdatedDesc(a, b) {
   return tb - ta;
 }
 
+let REPOSITORY = "";
+
+function linkItems(issue) {
+  const items = [];
+  const repoBase = REPOSITORY ? "https://github.com/" + REPOSITORY : "";
+
+  const issueUrl = issue.issueUrl || (repoBase ? repoBase + "/issues/" + issue.number : "");
+  if (issueUrl) items.push({ label: "Issue #" + issue.number, url: issueUrl, cls: "" });
+
+  if (issue.pullRequestUrl) {
+    const m = String(issue.pullRequestUrl).match(new RegExp("/pull/([0-9]+)"));
+    const num = issue.pullRequestNumber || (m ? m[1] : "");
+    items.push({ label: num ? "PR #" + num : "PR", url: issue.pullRequestUrl, cls: "" });
+  } else if (issue.branch && repoBase) {
+    // PRのURLが状態ファイルに無い場合は、ブランチ名でPRを検索するリンクにする
+    items.push({
+      label: "PRを探す",
+      url: repoBase + "/pulls?q=" + encodeURIComponent("is:pr head:" + issue.branch),
+      cls: "search"
+    });
+  }
+
+  if (issue.previewUrl) items.push({ label: "プレビュー", url: issue.previewUrl, cls: "" });
+  return items;
+}
+
 function buildLinks(issue) {
-  const links = [];
-  if (issue.issueUrl) links.push('<a href="' + escapeHtml(issue.issueUrl) + '" target="_blank" rel="noopener">Issue</a>');
-  if (issue.pullRequestUrl) links.push('<a href="' + escapeHtml(issue.pullRequestUrl) + '" target="_blank" rel="noopener">PR</a>');
-  if (issue.previewUrl) links.push('<a href="' + escapeHtml(issue.previewUrl) + '" target="_blank" rel="noopener">プレビュー</a>');
-  return links.length ? '<div class="links">' + links.join("") + "</div>" : "";
+  const items = linkItems(issue);
+  if (!items.length) return "";
+  return '<div class="links">' + items.map(function (it) {
+    return '<a class="' + it.cls + '" href="' + escapeHtml(it.url) + '" target="_blank" rel="noopener">' +
+      escapeHtml(it.label) + " ↗</a>";
+  }).join("") + "</div>";
 }
 
 function buildCard(issue, result, actor) {
@@ -338,6 +379,7 @@ function renderLegend() {
 }
 
 function render(data) {
+  REPOSITORY = data.repository || "";
   const groups = { human: [], cline: [], pa: [], system: [], done: [] };
   const issues = (data.issues || []).slice().sort(byUpdatedDesc);
 
@@ -361,10 +403,18 @@ function render(data) {
     ? done.map(function (item) {
         const issue = item.issue;
         const ok = issue.status === "completed";
-        return '<div class="done-row"><span>#' + issue.number + " " + escapeHtml(issue.title) + "</span>" +
-          '<span class="meta" style="color:' + (ok ? "#3B6D11" : "#888780") + ';">' +
-          escapeHtml(issue.statusLabel || issue.status) + " ・ " +
-          escapeHtml(formatElapsed(secondsSince(issue.updatedAt))) + "</span></div>";
+        const orphan = !TERMINAL.includes(issue.status);
+        const label = orphan
+          ? "退避済み（" + (issue.statusLabel || issue.status) + "のまま）"
+          : (issue.statusLabel || issue.status);
+        const pending = (issue.pendingNotifications || {}).count || 0;
+        const pendingNote = pending ? " ・ 未送信通知" + pending + "件" : "";
+        return '<div class="done-row"><div class="done-head"><span>#' + issue.number + " " +
+          escapeHtml(issue.title) + "</span>" +
+          '<span class="meta" style="color:' + (ok ? "#3B6D11" : orphan ? "#A32D2D" : "#888780") + ';">' +
+          escapeHtml(label) + " ・ " +
+          escapeHtml(formatElapsed(secondsSince(issue.updatedAt))) + escapeHtml(pendingNote) + "</span></div>" +
+          buildLinks(issue) + "</div>";
       }).join("")
     : '<div class="empty">なし</div>';
 

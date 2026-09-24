@@ -51,9 +51,13 @@ def test_build_dashboard_json_contains_generated_at_and_issues(agent_env):
             "issueUrl": None,
             "pullRequestUrl": None,
             "previewUrl": None,
+            "pullRequestNumber": None,
+            "branch": "",
             "pendingNotifications": {"count": 0, "oldestAt": None},
+            "archived": False,
         }
     ]
+    assert payload["repository"] == agent_env.repository
 
 
 def test_build_dashboard_json_passes_through_links_and_timestamps():
@@ -397,3 +401,92 @@ def test_js_sorts_by_updated_at_descending():
     )
     # 日時が無いものは最後に回ること
     assert out == "2,3,1,4"
+
+
+# ============================================================
+# 退避済み（state/done/）のIssueは、statusに関係なく「終了」扱い（回帰テスト）
+#
+# 実運用で、state/done/ に "implementing" や "waiting_approval" のまま
+# 退避されたIssueが、ダッシュボードの「Cline作業中」「人の対応待ち」列に
+# 表示され続けてしまう不具合があった。
+# ============================================================
+
+def test_collect_rows_marks_done_folder_rows_as_archived(agent_env):
+    statefile.create(80, {"issueTitle": "稼働中", "status": statefile.Status.IMPLEMENTING})
+    statefile.create(63, {"issueTitle": "退避済み", "status": statefile.Status.IMPLEMENTING})
+    statefile.archive(63)
+
+    rows = dict(da._collect_rows())
+
+    assert not rows[80].get("archived")
+    assert rows[63]["archived"] is True
+
+
+def test_build_dashboard_json_passes_archived_flag(agent_env):
+    payload = da.build_dashboard_json(
+        [(63, {"status": "implementing", "archived": True}), (80, {"status": "implementing"})]
+    )
+    flags = {issue["number"]: issue["archived"] for issue in payload["issues"]}
+    assert flags == {63: True, 80: False}
+
+
+def test_js_routes_archived_issue_to_done_regardless_of_status():
+    out = _run_js_logic(
+        "const a=classify({status:'implementing',archived:true,updatedAt:ago(86400),pendingNotifications:none});"
+        "const b=classify({status:'waiting_approval',archived:true,updatedAt:ago(86400),pendingNotifications:none});"
+        "const c=classify({status:'implementing',archived:false,updatedAt:ago(60),pendingNotifications:none});"
+        "console.log([a.actor,b.actor,c.actor].join(','));"
+    )
+    assert out == "done,done,cline"
+
+
+# ============================================================
+# リンク表示（Issue番号・PR番号・PR検索のフォールバック）
+# ============================================================
+
+def test_js_links_show_issue_and_pr_numbers():
+    out = _run_js_logic(
+        "REPOSITORY='owner/tools';"
+        "const items=linkItems({number:68,issueUrl:'https://github.com/owner/tools/issues/68',"
+        "pullRequestUrl:'https://github.com/owner/tools/pull/69',"
+        "previewUrl:'https://owner.github.io/tools-beta/preview/issue-68/'});"
+        "console.log(items.map(i=>i.label).join('|'));"
+    )
+    assert out == "Issue #68|PR #69|プレビュー"
+
+
+def test_js_links_fall_back_to_pr_search_by_branch():
+    out = _run_js_logic(
+        "REPOSITORY='owner/tools';"
+        "const items=linkItems({number:62,branch:'issue-62-customer8'});"
+        "console.log(items.map(i=>i.label+'='+i.url).join('|'));"
+    )
+    assert "Issue #62=https://github.com/owner/tools/issues/62" in out
+    assert "PRを探す=https://github.com/owner/tools/pulls?q=is%3Apr%20head%3Aissue-62-customer8" in out
+
+
+def test_js_links_omit_pr_when_no_url_and_no_branch():
+    out = _run_js_logic(
+        "REPOSITORY='owner/tools';"
+        "console.log(linkItems({number:80}).map(i=>i.label).join('|'));"
+    )
+    assert out == "Issue #80"
+
+
+# ============================================================
+# 未送信通知の取り残しで、終了済みIssueが「自動連携待ち」に出ないこと（回帰テスト）
+#
+# 実運用で、フロー④がTeams投稿後のファイル移動に失敗し続けた結果、
+# reply/ に大量の通知ファイルが残り、退避済み・完了済みのIssueが
+# 15件も「自動連携待ち」列に並んでしまった。
+# ============================================================
+
+def test_js_stale_notifications_on_archived_or_completed_issue_go_to_done():
+    out = _run_js_logic(
+        "const stale={count:68,oldestAt:ago(172800)};"
+        "const a=classify({status:'waiting_approval',archived:true,updatedAt:ago(172800),pendingNotifications:stale});"
+        "const b=classify({status:'completed',updatedAt:ago(86400),pendingNotifications:stale});"
+        "const c=classify({status:'waiting_decision',updatedAt:ago(300),pendingNotifications:{count:1,oldestAt:ago(600)}});"
+        "console.log([a.actor,b.actor,c.actor].join(','));"
+    )
+    assert out == "done,done,pa"

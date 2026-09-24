@@ -196,7 +196,7 @@ URL   : https://&lt;owner&gt;.github.io/tools-beta/utility/agent.html
 </tr>
 <tr>
 <td>自動連携待ち</td>
-<td>（状態に関係なく）未送信の通知が3分以上残っている</td>
+<td>稼働中のIssueで、未送信の通知が3分以上残っている</td>
 <td>Power AutomateがTeamsへまだ送っていない</td>
 </tr>
 <tr>
@@ -219,6 +219,25 @@ Teamsに届いていないケースとは区別できません。区別したい
 フロー②③の最後に「投稿完了」を示すファイルを書き出す（または
 <code>question/</code>・<code>waiting/</code> のファイルを <code>done/</code> へ移動する）処理を追加する
 必要があります。</p>
+<p><code>state/done/</code> に退避済みのIssueと、完了・却下したIssueは、状態の文字列や
+未送信通知の有無に関係なく、下部の「終了」一覧に表示されます。完了・却下
+以外のまま退避されたものは「退避済み（実装中のまま）」のように赤字で表示
+されるので、GitHub上のIssueがまだopenのまま取り残されていないか確認する
+目安にしてください。</p>
+<p>各カードには「Issue #N」「PR #N」「プレビュー」へのリンクを表示します。
+状態ファイルにPRのURLが無い古いIssueでも、ブランチ名が分かれば「PRを探す」
+（GitHubのPR検索）へのリンクを表示します。</p>
+<p><strong>「未送信通知N件」が大量に残っている場合</strong>: フロー④が「Teamsへの投稿は
+成功するが、その後の <code>reply/done/</code> への移動に失敗している」可能性が高いです。
+初期版の <code>04_reply_to_teams.zip</code> はファイル移動の設定名に誤り（<code>sourceFileId</code>、
+正しくは <code>id</code>）があったため、そのままインポートしたフローは毎回この状態になります。
+<code>tools/build_flows.py</code> で再生成したzipを再インポートするか、Power Automate上で
+該当アクションの設定を修正してください。修正後、溜まっている古い通知は
+次で <code>done/</code> へ移動できます（既にTeamsへ投稿済みのものを再送しないため）。</p>
+<pre><code class="language-powershell">Get-ChildItem &quot;$env:AGENT_ROOT\reply&quot; -Filter &quot;*.json&quot; |
+    Where-Object LastWriteTime -lt (Get-Date).AddHours(-1) |
+    Move-Item -Destination &quot;$env:AGENT_ROOT\reply\done&quot;
+</code></pre>
 <p><strong>表示HTMLの更新</strong>: <code>utility/agent.html</code> は <code>dashboard_agent.py</code> 内の
 テンプレートから生成され、テンプレートのバージョン（<code>AGENT_HTML_VERSION</code>）が
 上がると、公開済みの自動生成版は次回の更新時に自動で置き換わります。

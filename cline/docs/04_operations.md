@@ -104,7 +104,7 @@ URL   : https://<owner>.github.io/tools-beta/utility/agent.html
 | --- | --- | --- |
 | 人の対応待ち | `waiting_decision` `waiting_approval` `failed` | Teamsでの回答・承認、または停止したIssueへの修正指示（`agent_cli.py rework`）が必要 |
 | Cline作業中 | `implementing` | VS Code上でClineが実装中 |
-| 自動連携待ち | （状態に関係なく）未送信の通知が3分以上残っている | Power AutomateがTeamsへまだ送っていない |
+| 自動連携待ち | 稼働中のIssueで、未送信の通知が3分以上残っている | Power AutomateがTeamsへまだ送っていない |
 | システム処理中 | `created` `queued` `rework` `preview_deploying` `approved` | Pythonの着手・公開・マージ処理中 |
 
 長時間そのままのものは赤字で警告します（Cline作業中が1時間超で
@@ -121,6 +121,30 @@ Teamsに届いていないケースとは区別できません。区別したい
 フロー②③の最後に「投稿完了」を示すファイルを書き出す（または
 `question/`・`waiting/` のファイルを `done/` へ移動する）処理を追加する
 必要があります。
+
+`state/done/` に退避済みのIssueと、完了・却下したIssueは、状態の文字列や
+未送信通知の有無に関係なく、下部の「終了」一覧に表示されます。完了・却下
+以外のまま退避されたものは「退避済み（実装中のまま）」のように赤字で表示
+されるので、GitHub上のIssueがまだopenのまま取り残されていないか確認する
+目安にしてください。
+
+各カードには「Issue #N」「PR #N」「プレビュー」へのリンクを表示します。
+状態ファイルにPRのURLが無い古いIssueでも、ブランチ名が分かれば「PRを探す」
+（GitHubのPR検索）へのリンクを表示します。
+
+**「未送信通知N件」が大量に残っている場合**: フロー④が「Teamsへの投稿は
+成功するが、その後の `reply/done/` への移動に失敗している」可能性が高いです。
+初期版の `04_reply_to_teams.zip` はファイル移動の設定名に誤り（`sourceFileId`、
+正しくは `id`）があったため、そのままインポートしたフローは毎回この状態になります。
+`tools/build_flows.py` で再生成したzipを再インポートするか、Power Automate上で
+該当アクションの設定を修正してください。修正後、溜まっている古い通知は
+次で `done/` へ移動できます（既にTeamsへ投稿済みのものを再送しないため）。
+
+```powershell
+Get-ChildItem "$env:AGENT_ROOT\reply" -Filter "*.json" |
+    Where-Object LastWriteTime -lt (Get-Date).AddHours(-1) |
+    Move-Item -Destination "$env:AGENT_ROOT\reply\done"
+```
 
 **表示HTMLの更新**: `utility/agent.html` は `dashboard_agent.py` 内の
 テンプレートから生成され、テンプレートのバージョン（`AGENT_HTML_VERSION`）が
