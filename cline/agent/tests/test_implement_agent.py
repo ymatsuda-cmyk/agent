@@ -207,7 +207,13 @@ def test_changes_signature_excludes_control_files(git_repo):
     assert ".agent-summary.json" not in signature
 
 
-def test_exclude_control_files_registers_git_exclude(git_repo):
+def test_exclude_control_files_really_hides_them_from_git(git_repo):
+    """
+    除外設定を書いた場所ではなく、Gitが実際に無視するかどうかを確かめる。
+
+    以前のテストは worktree個別の管理フォルダに文字列が書かれているかだけを
+    見ていたため、「Gitはそこを読まない」という不具合を見逃していた。
+    """
     worker = _worker(15)
     path, branch = gitops.prepare_worktree(15, "テスト", "main")
     worker.worktree = path
@@ -215,12 +221,25 @@ def test_exclude_control_files_registers_git_exclude(git_repo):
 
     worker.exclude_control_files()
 
-    exclude_path = path / ".git"
-    gitdir = exclude_path.read_text(encoding="utf-8").split("gitdir:", 1)[1].strip()
-    content = (__import__("pathlib").Path(gitdir) / "info" / "exclude").read_text(encoding="utf-8")
-    assert ".agent-summary.json" in content
-    assert ".agent-question.json" in content
-    assert ".agent-rework.txt" in content
+    for name in (".agent-summary.json", ".agent-question.json", ".agent-rework.txt"):
+        (path / name).write_text("x", encoding="utf-8")
+    (path / ".agent-attachments").mkdir()
+    (path / ".agent-attachments" / "a.png").write_bytes(b"img")
+    (path / "real.html").write_text("<p>x</p>", encoding="utf-8")
+
+    assert gitops.changed_files(path) == ["real.html"]
+
+
+def test_exclude_control_files_is_idempotent(git_repo):
+    worker = _worker(16)
+    path, branch = gitops.prepare_worktree(16, "テスト", "main")
+    worker.worktree = path
+
+    worker.exclude_control_files()
+    worker.exclude_control_files()
+
+    content = gitops.git_path(path, "info/exclude").read_text(encoding="utf-8")
+    assert content.count(".agent-summary.json") == 1
 
 
 def test_read_summary_deletes_summary_file_after_reading(agent_env):
@@ -390,3 +409,44 @@ def test_ensure_draft_pr_updates_body_when_reusing_existing_pr(monkeypatch, agen
     assert len(update_calls) == 1
     assert update_calls[0][0] == 69
     assert "再実装で直した内容" in update_calls[0][1]
+
+
+# ============================================================
+# 参考画像の配置（prepare）
+# ============================================================
+
+def test_prepare_places_attachments_and_excludes_them_from_changes(git_repo, monkeypatch):
+    from agent_core import statefile
+
+    image = git_repo.request_dir / "attachments" / "m1" / "画面.png"
+    image.parent.mkdir(parents=True)
+    image.write_bytes(b"img")
+    statefile.create(
+        90,
+        {"issueTitle": "画像付き", "attachments": [
+            {"name": "画面.png", "localPath": str(image), "url": ""}
+        ]},
+    )
+
+    monkeypatch.setattr(
+        "implement_agent.ghcli.view_issue",
+        lambda n: {"number": n, "title": "画像付き", "url": "https://x/90", "state": "OPEN"},
+    )
+    worker = _worker(90)
+
+    assert worker.prepare() is True
+    assert worker.attachment_paths == [".agent-attachments/画面.png"]
+    assert (worker.worktree / ".agent-attachments" / "画面.png").exists()
+    # 配置した画像は「変更」として数えられない（コミットもされない）
+    assert worker.changes_signature() == ()
+    assert gitops.changed_files(worker.worktree) == []
+
+
+def test_build_prompt_includes_placed_attachments(git_repo):
+    worker = _worker(91)
+    worker.worktree.mkdir(parents=True, exist_ok=True)
+    worker.attachment_paths = [".agent-attachments/a.png"]
+
+    text = worker.build_prompt()
+
+    assert "- .agent-attachments/a.png" in text

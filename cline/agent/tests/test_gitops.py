@@ -130,3 +130,40 @@ def test_remove_worktree_cleans_up(git_repo):
     assert not path.exists()
     result = gitops.git("worktree", "list", "--porcelain")
     assert path.as_posix() not in result.stdout.replace("\\", "/")
+
+
+# ============================================================
+# 日本語ファイル名（core.quotepath）の回帰テスト
+#
+# 既定のGitは日本語のパスを "\347\224\273..." のように出力するため、
+# 変更ファイルの一覧が実在しないパス扱いになり、マージ前のHTML検査や
+# プレビューURLの判定から漏れていた。
+# ============================================================
+
+def test_changed_files_returns_japanese_names_as_is(git_repo):
+    path, _ = gitops.prepare_worktree(30, "日本語テスト", "main")
+    (path / "お知らせ").mkdir()
+    (path / "お知らせ" / "画面.html").write_text("<p>x</p>", encoding="utf-8")
+
+    changed = gitops.changed_files(path)
+
+    assert changed == ["お知らせ/画面.html"]
+    assert (path / changed[0]).exists()
+
+
+def test_committed_files_returns_japanese_names_as_is(git_repo):
+    path, branch = gitops.prepare_worktree(31, "日本語テスト2", "main")
+    (path / "資料.html").write_text("<p>x</p>", encoding="utf-8")
+    gitops.commit_all(path, "add")
+
+    assert gitops.committed_files(path, "main", branch) == ["資料.html"]
+
+
+def test_git_path_resolves_shared_exclude_for_worktree(git_repo):
+    path, _ = gitops.prepare_worktree(32, "パス確認", "main")
+
+    exclude = gitops.git_path(path, "info/exclude")
+
+    # worktree個別の管理フォルダ（.git/worktrees/...）ではなく、共通側を指すこと
+    assert "worktrees" not in exclude.parts
+    assert exclude.name == "exclude"

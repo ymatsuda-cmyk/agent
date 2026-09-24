@@ -23,7 +23,7 @@ import subprocess
 import sys
 import time
 
-from agent_core import cline, ghcli, gitops, prompt, statefile, teams
+from agent_core import attachments, cline, ghcli, gitops, prompt, statefile, teams
 from agent_core.config import CONFIG
 from agent_core.jsonio import (
     move_to_done,
@@ -50,6 +50,8 @@ class Worker:
         self.branch = ""
         self.issue: dict = {}
         self.session_started_at = time.time()
+        #: worktreeに配置した参考画像（worktreeからの相対パス）
+        self.attachment_paths: list[str] = []
 
     # --------------------------------------------------------
     # 制御ファイル
@@ -116,6 +118,17 @@ class Worker:
 
         self.log.info(f"ブランチ : {self.branch}")
         self.log.info(f"worktree : {self.worktree}")
+
+        # 制御ファイルと参考画像は、配置した瞬間から変更として数えないよう
+        # 先にコミット対象外へ登録しておく（変更検知の誤判定を防ぐ）。
+        self.exclude_control_files()
+        self.attachment_paths = attachments.copy_into_worktree(
+            statefile.load(self.issue_number).get("attachments") or [],
+            self.worktree,
+            logger=self.log,
+        )
+        if self.attachment_paths:
+            self.log.info(f"参考画像を配置しました: {len(self.attachment_paths)}件")
         return True
 
     # --------------------------------------------------------
@@ -134,7 +147,8 @@ class Worker:
                 comment = str(statefile.load(self.issue_number).get("reworkComment", ""))
 
             return prompt.build_rework_prompt(
-                self.issue_number, comment, self.branch, str(self.worktree)
+                self.issue_number, comment, self.branch, str(self.worktree),
+                attachment_paths=self.attachment_paths,
             )
 
         return prompt.build_implementation_prompt(
@@ -142,6 +156,7 @@ class Worker:
             self.branch,
             str(self.worktree),
             f"{CONFIG.pages_base_url}/preview/issue-{self.issue_number}/",
+            attachment_paths=self.attachment_paths,
         )
 
     def send_to_cline(self, text: str, first_time: bool) -> None:
@@ -260,7 +275,7 @@ class Worker:
         files = [
             path
             for path in gitops.changed_files(self.worktree)
-            if pathlib.Path(path).name not in prompt.CONTROL_FILES
+            if not prompt.is_control_path(path)
         ]
         return tuple(sorted(files))
 
@@ -493,21 +508,19 @@ class Worker:
         return True
 
     def exclude_control_files(self) -> None:
-        """制御ファイルを .git/info/exclude に登録し、コミットされないようにする。"""
-        exclude_path = self.worktree / ".git"
+        """
+        制御ファイルと参考画像フォルダを info/exclude に登録し、コミットされないようにする。
 
-        # worktreeでは .git はファイル（gitdirへのポインタ）。
-        if exclude_path.is_file():
-            try:
-                content = exclude_path.read_text(encoding="utf-8").strip()
-                gitdir = content.split("gitdir:", 1)[1].strip()
-                exclude_path = pathlib.Path(gitdir)
-            except (OSError, IndexError):
-                return
-
-        info_dir = exclude_path / "info"
-        info_dir.mkdir(parents=True, exist_ok=True)
-        exclude_file = info_dir / "exclude"
+        以前は worktree個別の管理フォルダ（.git/worktrees/issue-N/info/exclude）に
+        書いていたが、Gitは worktree でも info/exclude を本体と共通の管理フォルダ
+        からしか読まないため、書いても無視されていた。Git自身にパスを解決させる。
+        """
+        try:
+            exclude_file = gitops.git_path(self.worktree, "info/exclude")
+        except gitops.GitError as error:
+            self.log.warn(f"除外設定の場所を特定できませんでした: {error}")
+            return
+        exclude_file.parent.mkdir(parents=True, exist_ok=True)
 
         existing = ""
         if exclude_file.exists():
@@ -516,7 +529,8 @@ class Worker:
             except OSError:
                 existing = ""
 
-        additions = [name for name in prompt.CONTROL_FILES if name not in existing]
+        entries = list(prompt.CONTROL_FILES) + [f"/{attachments.WORKTREE_DIR_NAME}/"]
+        additions = [name for name in entries if name not in existing]
         if additions:
             with exclude_file.open("a", encoding="utf-8") as stream:
                 stream.write("\n# AIエージェント制御ファイル\n")
@@ -801,7 +815,7 @@ class Worker:
         changed_files = [
             path
             for path in changed_files
-            if pathlib.Path(path).name not in prompt.CONTROL_FILES
+            if not prompt.is_control_path(path)
         ]
 
         preview_url = self.deploy_preview(changed_files)

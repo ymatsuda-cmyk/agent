@@ -250,8 +250,16 @@ Clineには「チャットに書くだけでなくファイルを作る」こと
 | `.agent-question.json` | Cline | 人の判断が必要。作成後は実装を止める |
 | `.agent-summary.json` | Cline | 実装完了報告。**これの作成＝完了判定** |
 | `.agent-rework.txt` | Python | 差し戻し時の修正指示 |
+| `.agent-attachments/` | Python | Teams投稿に添付された参考画像（フォルダ） |
 
-これらは `.git/info/exclude` に自動登録され、コミット対象になりません。
+これらは `info/exclude` に自動登録され、コミット対象・プレビュー公開の対象に
+なりません。worktreeでは、Gitは `info/exclude` を本体リポジトリと共通の管理
+フォルダからしか読まないため、登録先はGit自身に解決させています
+（`gitops.git_path()`）。以前はworktree個別の管理フォルダに書いていて、
+登録しても無視されていました。
+
+画像の受け渡しの全体（Teams → Power Automate → Issue本文 → worktree）は
+`docs/03_power_automate.md` の「2-1. 画像を含む投稿をIssueへ載せる」を参照。
 
 ### `.agent-question.json`
 

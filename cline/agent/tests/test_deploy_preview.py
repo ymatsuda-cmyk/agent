@@ -160,3 +160,14 @@ def test_cleanup_removes_preview_directory(full_repo_env):
 def test_cleanup_is_noop_when_nothing_deployed(full_repo_env):
     result = dp.cleanup(999)
     assert result["status"] == "nothing_to_clean"
+
+
+def test_copy_worktree_tree_excludes_attachments_folder(full_repo_env):
+    worktree = _make_worktree(full_repo_env, 21)
+    (worktree / ".agent-attachments").mkdir()
+    (worktree / ".agent-attachments" / "a.png").write_bytes(b"img")
+
+    beta_repo = dp.ensure_beta_repo()
+    copied = dp.copy_worktree_tree(worktree, beta_repo, 21)
+
+    assert not any(path.startswith(".agent-attachments") for path in copied)

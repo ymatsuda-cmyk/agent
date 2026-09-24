@@ -57,7 +57,27 @@ def git(
     cwd: pathlib.Path | None = None,
     check: bool = True,
 ) -> subprocess.CompletedProcess[str]:
-    return run(["git", *args], cwd=cwd or CONFIG.target_repo, check=check)
+    # core.quotepath=false: 既定のままだと日本語のパスが "\347\224\273..." の
+    # ような8進エスケープで出力され、変更ファイルの判定（静的チェック・
+    # プレビューURLの推測など）で実在するファイルとして扱えなくなる。
+    return run(
+        ["git", "-c", "core.quotepath=false", *args],
+        cwd=cwd or CONFIG.target_repo,
+        check=check,
+    )
+
+
+def git_path(worktree: pathlib.Path, name: str) -> pathlib.Path:
+    """
+    Gitが実際に参照する管理ファイルのパスを返す（例: "info/exclude"）。
+
+    worktreeでは管理フォルダが「worktree個別」と「本体と共通」に分かれており、
+    info/exclude は共通側だけが読まれる。自前でパスを組み立てると
+    読まれない場所へ書いてしまうため、Git自身に解決させる。
+    """
+    result = git("rev-parse", "--git-path", name, cwd=worktree)
+    path = pathlib.Path(result.stdout.strip())
+    return path if path.is_absolute() else (worktree / path).resolve()
 
 
 def require_command(name: str) -> None:

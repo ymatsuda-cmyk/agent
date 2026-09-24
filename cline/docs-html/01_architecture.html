@@ -420,9 +420,20 @@ PRは自動で更新されます。</p>
 <td>Python</td>
 <td>差し戻し時の修正指示</td>
 </tr>
+<tr>
+<td><code>.agent-attachments/</code></td>
+<td>Python</td>
+<td>Teams投稿に添付された参考画像（フォルダ）</td>
+</tr>
 </tbody>
 </table>
-<p>これらは <code>.git/info/exclude</code> に自動登録され、コミット対象になりません。</p>
+<p>これらは <code>info/exclude</code> に自動登録され、コミット対象・プレビュー公開の対象に
+なりません。worktreeでは、Gitは <code>info/exclude</code> を本体リポジトリと共通の管理
+フォルダからしか読まないため、登録先はGit自身に解決させています
+（<code>gitops.git_path()</code>）。以前はworktree個別の管理フォルダに書いていて、
+登録しても無視されていました。</p>
+<p>画像の受け渡しの全体（Teams → Power Automate → Issue本文 → worktree）は
+<code>docs/03_power_automate.md</code> の「2-1. 画像を含む投稿をIssueへ載せる」を参照。</p>
 <h3 id="agent-questionjson"><code>.agent-question.json</code></h3>
 <pre><code class="language-json">{
   &quot;type&quot;: &quot;cline_question&quot;,

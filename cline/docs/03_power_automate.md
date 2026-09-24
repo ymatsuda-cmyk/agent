@@ -135,6 +135,85 @@ Bot除外条件を使う場合は、①のトリガー直後に「条件」を�
 `id` はTeamsのMessage IDです。Python側はこれで重複を判定するので、
 **必ず含めてください**。HTMLタグはPython側で除去します。
 
+### 2-1. 画像を含む投稿をIssueへ載せる（任意）
+
+Python側（`issue_agent.py`）は、依頼JSONに `attachments` があれば、
+その画像を `tools-beta` の `issue-assets/<Message ID>/` へ公開し、Issue本文の
+「添付画像」欄に埋め込みます。さらに実装時は、worktreeの `.agent-attachments/`
+（コミット対象外）へコピーし、Clineへのプロンプトで参考画像として伝えます。
+`attachments` が無い依頼は従来どおり動くので、このフロー変更は後からで構いません。
+
+**約束事（フロー①が守ること）**
+
+1. 画像を `/work/agent/request/attachments/<Message ID>/<ファイル名>` へ保存する
+2. **画像を全て保存してから**、最後に依頼JSONを作成する
+   （依頼JSONの作成が `issue_agent.py` の起動合図になるため）
+3. 依頼JSONに、保存した画像のファイル名一覧を追加する
+
+```json
+{
+  "message": "<p>この画面のボタン配置を直してください</p>",
+  "sender": "松田",
+  "id": "1726900000000",
+  "datetime": "2026-09-21T06:00:00Z",
+  "attachments": [{ "name": "画面.png" }, { "name": "pasted-1.png" }]
+}
+```
+
+対応する拡張子は `.png` `.jpg` `.jpeg` `.gif` `.webp`、1枚10MBまで、1件の
+依頼につき10枚までです。それ以外は無視されます。OneDriveの同期が遅れて
+画像がJSONより後に届いても、最大60秒は待ちます。揃わなかった画像は
+Issue本文に「取得できなかった画像」として名前だけ残し、Issue作成は止めません。
+
+**画像の公開範囲**: 画像は `tools-beta` に置かれ、URLを知っていれば誰でも
+見られます（プレビューと同じ扱い）。社外に見せられない画像は投稿しないでください。
+
+**ファイルとして添付された画像**
+
+トリガーの出力 `attachments` のうち、`contentType` が `reference` の要素が
+添付ファイルです（`name` にファイル名、`contentUrl` にSharePoint上のURL）。
+チャネルに添付したファイルはチームのSharePointサイトの「ドキュメント」に
+保存されているため、SharePointの「ファイル コンテンツの取得（パスによる）」で
+中身を取得し、OneDrive for Businessの「ファイルの作成」で上記の場所へ保存します。
+`contentUrl` からサイトのアドレスとファイルのパスを取り出す式は、実際の
+`contentUrl` の形を見ながら組み立ててください。
+
+**メッセージ欄に直接貼り付けた画像**
+
+貼り付けた画像はファイルではなく、本文のHTMLに
+`<img src="https://graph.microsoft.com/v1.0/.../hostedContents/<ID>/$value">`
+という形で埋め込まれ、取得にはMicrosoft Graphへの認証付きアクセスが必要です。
+利用できるアクションはテナントの設定やライセンスによって異なるため、
+まず次のどちらが使えるかを実際の環境で確認してください。
+
+- Teamsコネクタの「Microsoft Graph HTTP 要求を送信します」（利用可能な場合）
+- 「HTTP with Microsoft Entra ID」コネクタ（プレミアム）
+
+本文HTMLから `hostedContents` を含む `src` を取り出し、そのURLへGETした結果を
+`pasted-1.png`、`pasted-2.png` のような名前で保存します（貼り付け画像には
+ファイル名が無いため）。JPEGでも拡張子を `.png` にしてしまって表示上の問題は
+ほぼありませんが、分かる場合は実際の形式に合わせてください。
+
+**動作確認（フローを変える前に、Python側だけ確かめる方法）**
+
+OneDriveの `request/attachments/test-001/` に適当な画像 `a.png` を置き、
+続けて次の内容で `request/test_image.json` を作ると、画像付きのIssueが作られます。
+
+```json
+{
+  "message": "画像付き依頼のテストです",
+  "sender": "動作確認",
+  "id": "test-001",
+  "datetime": "2026-09-24T00:00:00Z",
+  "attachments": [{ "name": "a.png" }]
+}
+```
+
+`request/attachments/` の画像は、Issue作成後も自動では消えません
+（実装時にworktreeへコピーする元として使うため）。容量が気になる場合は、
+完了したIssueの分を手で削除してください。削除しても、実装時は `tools-beta`
+から取り直します。
+
 ## 3. ② question → Teams質問 → decision
 
 **トリガー**: OneDrive「ファイルが作成されたとき」

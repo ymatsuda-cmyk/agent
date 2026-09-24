@@ -18,6 +18,32 @@ REWORK_FILE_NAME = ".agent-rework.txt"
 #: 実装成果物に含めてはいけない制御ファイル
 CONTROL_FILES = (QUESTION_FILE_NAME, SUMMARY_FILE_NAME, REWORK_FILE_NAME)
 
+#: 参考画像の置き場所（agent_core.attachments.WORKTREE_DIR_NAME と同じ値）
+ATTACHMENTS_DIR_NAME = ".agent-attachments"
+
+
+def is_control_path(path: str) -> bool:
+    """制御ファイル、または参考画像フォルダ配下のパスならTrue。"""
+    normalized = str(path).replace("\\", "/")
+    parts = [part for part in normalized.split("/") if part and part != "."]
+    if not parts:
+        return False
+    return parts[-1] in CONTROL_FILES or parts[0] == ATTACHMENTS_DIR_NAME
+
+
+def _attachments_section(attachment_paths: list[str] | None) -> str:
+    if not attachment_paths:
+        return ""
+    listing = "\n".join(f"- {path}" for path in attachment_paths)
+    return f"""
+参考画像（依頼者がTeamsに添付した画像）:
+{listing}
+- 作業ディレクトリ内のファイルです。画面イメージや不具合箇所の参考として必ず確認してください。
+- このフォルダ（{ATTACHMENTS_DIR_NAME}/）の中身は変更・削除しないでください。
+- このフォルダはコミットされません。画像をページ内で使う必要がある場合は、
+  適切な場所へコピーしてから、そのコピーを参照してください。
+"""
+
 
 COMMON_RULES = """\
 作業ルール:
@@ -100,6 +126,7 @@ def build_implementation_prompt(
     branch: str,
     worktree: str,
     preview_url_hint: str,
+    attachment_paths: list[str] | None = None,
 ) -> str:
     """初回実装用のプロンプト。"""
     labels = ", ".join(
@@ -123,14 +150,20 @@ URL: {issue['url']}
 - 本リポジトリはビルド不要の静的サイトです。
 - ターミナルはPowerShellです。
 - 実装後の動作確認は検証用サイト（{preview_url_hint}）で行います。
-
+{_attachments_section(attachment_paths)}
 {COMMON_RULES}
 {_question_contract(issue_number)}
 {_summary_contract(issue_number)}
 """
 
 
-def build_rework_prompt(issue_number: int, comment: str, branch: str, worktree: str) -> str:
+def build_rework_prompt(
+    issue_number: int,
+    comment: str,
+    branch: str,
+    worktree: str,
+    attachment_paths: list[str] | None = None,
+) -> str:
     """Teamsで差し戻された場合の再実装プロンプト。"""
     return f"""GitHub Issue #{issue_number} の実装が差し戻されました。修正してください。
 
@@ -144,7 +177,7 @@ def build_rework_prompt(issue_number: int, comment: str, branch: str, worktree: 
 - 既存の実装を土台に、指示された点だけを修正してください。
 - 指示に無い箇所を作り直さないでください。
 - 指示内容が不明瞭な場合は、推測せず質問してください。
-
+{_attachments_section(attachment_paths)}
 {COMMON_RULES}
 {_question_contract(issue_number)}
 {_summary_contract(issue_number)}

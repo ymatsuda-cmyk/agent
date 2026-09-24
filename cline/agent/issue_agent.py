@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import html
 import re
+import shutil
 import signal
 import sys
 import threading
@@ -23,11 +24,11 @@ import time
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
-from agent_core import statefile, teams
+from agent_core import attachments, statefile, teams
 from agent_core.config import CONFIG
 from agent_core.ghcli import create_issue
 from agent_core.jsonio import move_to_done, now_iso, read_json_when_ready, write_json
-from agent_core.locks import daemon_lock_path, release, try_acquire
+from agent_core.locks import acquire_or_wait, daemon_lock_path, release, try_acquire
 from agent_core.logs import get_logger, print_banner
 
 LOGGER = get_logger("issue_agent")
@@ -73,16 +74,17 @@ def build_issue_title(text: str) -> str:
     return title
 
 
-def build_issue_body(source: dict, text: str) -> str:
+def build_issue_body(source: dict, text: str, attachments_markdown: str = "") -> str:
     sender = str(source.get("sender", "") or "不明")
     posted_at = str(source.get("datetime", "") or "")
     message_id = extract_message_id(source)
+    images_section = f"{attachments_markdown.rstrip()}\n\n" if attachments_markdown else ""
 
     return f"""## 依頼内容
 
 {text or '(本文なし)'}
 
-## 依頼元
+{images_section}## 依頼元
 
 | 項目 | 内容 |
 | --- | --- |
@@ -100,6 +102,76 @@ def build_issue_body(source: dict, text: str) -> str:
 
 本Issueは Teams 投稿から自動生成されました。
 """
+
+
+# ============================================================
+# 添付画像
+# ============================================================
+
+def publish_images(
+    paths: list, folder: str
+) -> tuple[list[dict], list[str]]:
+    """
+    画像を tools-beta の issue-assets/<folder>/ へpushし、表示用URLを返す。
+
+    tools-beta はプレビュー公開・ダッシュボードと同じクローン・同じロックを
+    使うため、それらと同時に動いても競合しない。
+    戻り値は (公開できた画像 [{name, url, localPath}], 失敗した画像の説明)。
+    """
+    if not paths:
+        return [], []
+
+    from deploy_preview import (
+        BETA_LOCK_TIMEOUT_SECONDS,
+        beta_lock_path,
+        commit_and_push,
+        ensure_beta_repo,
+    )
+
+    lock = beta_lock_path()
+    if not acquire_or_wait(
+        lock, timeout_seconds=BETA_LOCK_TIMEOUT_SECONDS, note="issue_agent-attachments"
+    ):
+        LOGGER.warn("tools-betaのロックが取得できず、添付画像を公開できませんでした。")
+        return [], [f"{p.name}（アップロード待ちがタイムアウト）" for p in paths]
+
+    try:
+        beta_repo = ensure_beta_repo()
+        relative_dir = attachments.asset_relative_dir(folder)
+        destination = beta_repo / relative_dir
+        destination.mkdir(parents=True, exist_ok=True)
+
+        published: list[dict] = []
+        for path in paths:
+            shutil.copy2(path, destination / path.name)
+            published.append(
+                {
+                    "name": path.name,
+                    "url": attachments.raw_url(f"{relative_dir}/{path.name}"),
+                    "localPath": str(path),
+                }
+            )
+
+        commit_and_push(beta_repo, f"assets: Teams依頼の添付画像 {folder} ({len(published)}件)")
+        LOGGER.info(f"添付画像を公開しました: {len(published)}件")
+        return published, []
+    except Exception as error:  # 画像が載せられなくてもIssue作成は止めない
+        LOGGER.warn(f"添付画像の公開に失敗しました: {error}")
+        return [], [f"{p.name}（アップロード失敗）" for p in paths]
+    finally:
+        release(lock)
+
+
+def prepare_attachments(source: dict, message_id: str) -> tuple[list[dict], str]:
+    """依頼の画像を集めて公開し、(stateに残す情報, Issue本文用Markdown) を返す。"""
+    paths, problems = attachments.collect_request_images(source, message_id, logger=LOGGER)
+    if not paths and not problems:
+        return [], ""
+
+    folder = attachments.folder_name_for(source, message_id)
+    published, upload_problems = publish_images(paths, folder)
+    markdown = attachments.build_markdown(published, problems + upload_problems)
+    return published, markdown
 
 
 # ============================================================
@@ -206,7 +278,8 @@ def _process_file_inner(path) -> None:
         return
 
     title = build_issue_title(text)
-    body = build_issue_body(source, text)
+    images, images_markdown = prepare_attachments(source, message_id)
+    body = build_issue_body(source, text, images_markdown)
 
     LOGGER.info(f"Issue作成: {title}")
     issue = create_issue(title, body)
@@ -232,6 +305,7 @@ def _process_file_inner(path) -> None:
             "requester": str(source.get("sender", "")),
             "requestFile": path.name,
             "requestedAt": str(source.get("datetime", "")),
+            "attachments": images,
         },
     )
 

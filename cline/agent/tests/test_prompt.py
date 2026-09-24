@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from agent_core import prompt
 
 
@@ -127,3 +129,50 @@ def test_control_files_do_not_include_summary_files_by_accident():
     assert prompt.SUMMARY_FILE_NAME in prompt.CONTROL_FILES
     assert prompt.REWORK_FILE_NAME in prompt.CONTROL_FILES
     assert len(prompt.CONTROL_FILES) == 3
+
+
+# ============================================================
+# 参考画像（Teams投稿の添付画像）
+# ============================================================
+
+def test_implementation_prompt_lists_attachment_paths():
+    text = prompt.build_implementation_prompt(
+        _sample_issue(), "b", "/w", "https://x/",
+        attachment_paths=[".agent-attachments/画面.png"],
+    )
+    assert "参考画像" in text
+    assert "- .agent-attachments/画面.png" in text
+    assert "コミットされません" in text
+
+
+def test_implementation_prompt_has_no_attachment_section_without_images():
+    text = prompt.build_implementation_prompt(_sample_issue(), "b", "/w", "https://x/")
+    assert "参考画像" not in text
+
+
+def test_rework_prompt_lists_attachment_paths():
+    text = prompt.build_rework_prompt(
+        12, "修正して", "b", "/w", attachment_paths=[".agent-attachments/a.png"]
+    )
+    assert "- .agent-attachments/a.png" in text
+
+
+@pytest.mark.parametrize(
+    "path,expected",
+    [
+        (".agent-summary.json", True),
+        ("sub/.agent-question.json", True),
+        (".agent-attachments/a.png", True),
+        (".\\\\.agent-attachments\\\\b.png", True),
+        ("shop/index.html", False),
+        ("shop/.agent-attachments/c.png", False),
+    ],
+)
+def test_is_control_path(path, expected):
+    assert prompt.is_control_path(path) is expected
+
+
+def test_attachments_dir_name_matches_attachments_module():
+    from agent_core import attachments
+
+    assert prompt.ATTACHMENTS_DIR_NAME == attachments.WORKTREE_DIR_NAME

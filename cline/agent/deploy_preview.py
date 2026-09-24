@@ -30,7 +30,7 @@ LOGGER = get_logger("deploy_preview")
 BETA_LOCK_TIMEOUT_SECONDS = 900
 PREVIEW_ROOT = "preview"
 SKIP_NAMES = {".agent-question.json", ".agent-summary.json", ".agent-rework.txt"}
-SKIP_DIR_NAMES = {".git", "__pycache__", "node_modules", ".DS_Store"}
+SKIP_DIR_NAMES = {".git", "__pycache__", "node_modules", ".DS_Store", ".agent-attachments"}
 
 
 def beta_lock_path() -> pathlib.Path:
