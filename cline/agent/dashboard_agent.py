@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 import time
 from datetime import datetime
@@ -91,7 +92,7 @@ def _collect_rows() -> list[tuple[int, dict]]:
 
 
 # ============================================================
-# 時刻表示（generatedAtの付与にのみ使用。elapsed計算等はJS側で行う）
+# 時刻表示（generatedAt等の付与にのみ使用。経過時間の計算はJS側で行う）
 # ============================================================
 
 def _now_aware() -> datetime:
@@ -102,26 +103,57 @@ def _now_aware() -> datetime:
 # JSON組み立て
 # ============================================================
 
+def _pending_notifications(issue_number: int) -> dict:
+    """
+    reply/ に残っている（Power Automate④がまだTeamsへ送っていない）通知を数える。
+
+    フロー④は投稿後に reply/done/ へ移動するため、reply/ 直下に古い
+    ファイルが残っていれば「Power Automate待ち」と判断できる。
+    何分で「待ち」とみなすかの閾値は表示側（agent.html）で判断する。
+
+    質問カード（②）・承認カード（③）については、Teamsへ投稿済みかどうかを
+    ファイルから観測する手段が無いため、ここでは扱わない。
+    """
+    if not CONFIG._agent_root_was_set:
+        return {"count": 0, "oldestAt": None}
+
+    mtimes: list[float] = []
+    for path in CONFIG.reply_dir.glob(f"issue-{issue_number}-*.json"):
+        try:
+            mtimes.append(path.stat().st_mtime)
+        except OSError:
+            continue  # globとstatの間にフロー④が移動した場合
+
+    if not mtimes:
+        return {"count": 0, "oldestAt": None}
+
+    oldest = datetime.fromtimestamp(min(mtimes)).astimezone()
+    return {"count": len(mtimes), "oldestAt": oldest.isoformat(timespec="seconds")}
+
+
 def build_dashboard_json(rows: list[tuple[int, dict]]) -> dict:
     """
     Issue一覧から公開用JSONを組み立てる。
 
-    フェーズ分類・色分け・経過時間の表示・放置警告は、すべて
-    utility/agent.html 側のJavaScriptで行う。ここでは生データを
-    渡すだけにする（サーバー側とクライアント側でロジックが
-    二重管理になるのを避けるため）。
+    担当（人/Cline/Power Automate/システム）の分類・並び替え・色分け・
+    経過時間・放置警告は、すべて utility/agent.html 側のJavaScriptで行う。
+    ここでは判断材料となる生データだけを渡す。
     """
     issues = []
     for issue_number, data in sorted(rows, key=lambda item: item[0]):
+        status = str(data.get("status", "")).strip().lower()
         issues.append(
             {
                 "number": issue_number,
                 "title": str(data.get("issueTitle") or "(タイトルなし)"),
-                "status": str(data.get("status", "")).strip().lower(),
+                "status": status,
+                "statusLabel": statefile.label(status),
+                "error": str(data.get("error") or ""),
                 "updatedAt": data.get("updatedAt"),
                 "issueUrl": data.get("issueUrl"),
                 "pullRequestUrl": data.get("pullRequestUrl"),
                 "previewUrl": data.get("previewUrl"),
+                "pendingNotifications": _pending_notifications(issue_number),
             }
         )
 
@@ -137,33 +169,48 @@ def build_dashboard_json(rows: list[tuple[int, dict]]) -> dict:
 # データパス "../data/agent/dashboard.json" は DATA_DIR_NAME/DATA_FILENAME と
 # 手動で対応させている（このテンプレートは文字列埋め込みをしていないため、
 # 定数を変更した場合はここも合わせて直すこと）。
+#
+# テンプレートを変更したら AGENT_HTML_VERSION を上げること。
+# 公開済みの自動生成版は、次回の更新時に自動で置き換わる。
 # ============================================================
+
+AGENT_HTML_VERSION = 2
+_VERSION_META_NAME = "agent-dashboard-version"
 
 AGENT_HTML_TEMPLATE = """<!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="agent-dashboard-version" content="2">
 <title>Issue状態ダッシュボード</title>
 <style>
 * { box-sizing: border-box; }
 body { margin:0; font-family: -apple-system, "Segoe UI", "Hiragino Sans", "Noto Sans JP", Meiryo, sans-serif;
   background:#F5F4F0; color:#2C2C2A; }
-header { padding:16px 20px 8px; }
+header { padding:16px 20px 4px; }
 h1 { font-size:18px; font-weight:500; margin:0; }
+h2 { font-size:14px; font-weight:500; margin:0 0 8px; color:#5F5E5A; }
 .updated { font-size:12px; color:#5F5E5A; margin:4px 0 0; }
 .error { font-size:12px; color:#791F1F; margin:4px 0 0; }
-.board { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; padding:8px 20px 24px; }
-@media (max-width:640px) { .board { grid-template-columns:1fr; } }
-.column-title { font-size:13px; font-weight:500; color:#5F5E5A; margin-bottom:8px; }
+.legend { display:flex; flex-wrap:wrap; gap:6px 18px; font-size:12px; color:#5F5E5A; padding:8px 20px 4px; }
+.legend span { display:inline-flex; align-items:center; gap:6px; }
+.dot { width:10px; height:10px; border-radius:50%; display:inline-block; }
+.board { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; padding:8px 20px 16px; }
+@media (max-width:760px) { .board { grid-template-columns:1fr; } }
+.column-title { font-size:13px; font-weight:500; margin-bottom:8px; }
 .count { color:#888780; font-weight:400; }
-.card { border-radius:0 8px 8px 0; border-left:3px solid; padding:10px 12px; margin-bottom:8px; font-size:13px; }
+.card { border-left:3px solid; padding:10px 12px; margin-bottom:8px; font-size:13px; background:#FFFFFF; }
 .card-title { font-weight:500; }
-.card-status { font-size:11px; margin-top:4px; }
+.card-note { font-size:12px; margin-top:4px; }
+.card-meta { font-size:11px; color:#888780; margin-top:4px; }
 .links { font-size:11px; margin-top:6px; }
-.links a { color:#0C447C; text-decoration:none; margin-right:8px; }
+.links a { color:#0C447C; text-decoration:none; margin-right:10px; }
 .empty { font-size:12px; color:#888780; padding:8px 0; }
-.warn { color:#791F1F; font-weight:500; }
+.warn { color:#A32D2D; font-weight:500; }
+.done { padding:0 20px 24px; }
+.done-row { display:flex; justify-content:space-between; gap:12px; font-size:13px; padding:8px 0; border-bottom:0.5px solid #D3D1C7; }
+.done-row .meta { font-size:12px; color:#888780; white-space:nowrap; }
 </style>
 </head>
 <body>
@@ -172,120 +219,159 @@ h1 { font-size:18px; font-weight:500; margin:0; }
   <p class="updated" id="updated">読み込み中...</p>
   <p class="error" id="error" style="display:none;"></p>
 </header>
+<div class="legend" id="legend"></div>
 <main class="board" id="board"></main>
+<section class="done">
+  <h2>終了（新しい順）</h2>
+  <div id="done"></div>
+</section>
 
 <script>
 const DATA_URL = "../data/agent/dashboard.json";
 const POLL_INTERVAL_MS = 30000;
+// reply/ の通知がこの秒数を超えて未送信なら「Power Automate待ち」とみなす
+const PA_STALE_SECONDS = 180;
 
-const PHASES = [
-  ["待機中", ["created", "queued", "rework"]],
-  ["実装中", ["implementing", "waiting_decision", "preview_deploying"]],
-  ["承認待ち", ["waiting_approval", "approved"]],
-  ["終了", ["completed", "rejected", "failed"]]
+const ACTORS = [
+  { key: "human",  label: "人の対応待ち",   sub: "Teamsでの回答・承認・修正指示", color: ["#FAEEDA", "#BA7517", "#633806"] },
+  { key: "cline",  label: "Cline作業中",    sub: "VS Code上で実装中",             color: ["#E6F1FB", "#378ADD", "#0C447C"] },
+  { key: "pa",     label: "自動連携待ち",   sub: "Power AutomateのTeams送信待ち", color: ["#EEEDFE", "#7F77DD", "#3C3489"] },
+  { key: "system", label: "システム処理中", sub: "Pythonの着手・公開・マージ",     color: ["#F1EFE8", "#888780", "#444441"] }
 ];
 
-const STATUS_COLORS = {
-  created:           ["#F1EFE8", "#888780", "#5F5E5A"],
-  queued:            ["#F1EFE8", "#888780", "#5F5E5A"],
-  rework:            ["#FAEEDA", "#BA7517", "#633806"],
-  implementing:      ["#E6F1FB", "#378ADD", "#0C447C"],
-  waiting_decision:  ["#FAEEDA", "#BA7517", "#633806"],
-  preview_deploying: ["#E6F1FB", "#378ADD", "#0C447C"],
-  waiting_approval:  ["#FAEEDA", "#BA7517", "#633806"],
-  approved:          ["#E6F1FB", "#378ADD", "#0C447C"],
-  completed:         ["#EAF3DE", "#639922", "#173404"],
-  rejected:          ["#F1EFE8", "#888780", "#5F5E5A"],
-  failed:            ["#FCEBEB", "#E24B4A", "#791F1F"]
-};
-const DEFAULT_COLOR = STATUS_COLORS.created;
+const TERMINAL = ["completed", "rejected"];
 
-const STUCK_THRESHOLD_SECONDS = {
-  waiting_approval: 2 * 3600,
-  waiting_decision: 1 * 3600
+// status -> [担当, 説明, 警告を出す秒数(null=出さない), 警告文]
+const STATUS_MAP = {
+  created:           ["system", "着手待ち（空き枠待ち）",     1800, "停滞"],
+  queued:            ["system", "着手準備中",                 1800, "停滞"],
+  rework:            ["system", "再実装の着手待ち",           1800, "停滞"],
+  preview_deploying: ["system", "検証サイトへ公開中",         1800, "停滞"],
+  approved:          ["system", "マージ処理中",               1800, "停滞"],
+  implementing:      ["cline",  "Clineが実装中",              3600, "長時間・停止の可能性"],
+  waiting_decision:  ["human",  "Teamsで質問の回答待ち",      3600, "放置"],
+  waiting_approval:  ["human",  "Teamsで承認待ち",            7200, "放置"],
+  failed:            ["human",  "停止・要対応",               null, ""]
 };
 
-function phaseOf(status) {
-  for (const [name, statuses] of PHASES) {
-    if (statuses.includes(status)) return name;
-  }
-  return PHASES[PHASES.length - 1][0];
+function secondsSince(isoString) {
+  if (!isoString) return null;
+  const t = new Date(isoString).getTime();
+  if (isNaN(t)) return null;
+  return Math.max(0, Math.floor((Date.now() - t) / 1000));
 }
 
-function formatElapsed(isoString) {
-  if (!isoString) return { label: "", seconds: null };
-  const parsed = new Date(isoString);
-  if (isNaN(parsed.getTime())) return { label: "", seconds: null };
-
-  let seconds = Math.max(0, Math.floor((Date.now() - parsed.getTime()) / 1000));
-  if (seconds < 60) return { label: seconds + "秒前", seconds };
+function formatElapsed(seconds) {
+  if (seconds == null) return "";
+  if (seconds < 60) return seconds + "秒前";
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return { label: minutes + "分前", seconds };
+  if (minutes < 60) return minutes + "分前";
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return { label: hours + "時間" + (minutes % 60) + "分前", seconds };
-  const days = Math.floor(hours / 24);
-  return { label: days + "日前", seconds };
+  if (hours < 24) return hours + "時間" + (minutes % 60) + "分前";
+  return Math.floor(hours / 24) + "日前";
 }
 
 function escapeHtml(value) {
   const div = document.createElement("div");
-  div.textContent = String(value);
+  div.textContent = String(value == null ? "" : value);
   return div.innerHTML;
 }
 
-function buildCard(issue) {
+function classify(issue) {
   const status = (issue.status || "").toLowerCase();
-  const [bg, border, textColor] = STATUS_COLORS[status] || DEFAULT_COLOR;
-  const elapsed = formatElapsed(issue.updatedAt);
-  const threshold = STUCK_THRESHOLD_SECONDS[status];
-  const isStuck = threshold != null && elapsed.seconds != null && elapsed.seconds >= threshold;
+  const pending = issue.pendingNotifications || {};
+  const pendingAge = secondsSince(pending.oldestAt);
 
-  let statusLine = escapeHtml(status);
-  if (elapsed.label) statusLine += " ・ " + escapeHtml(elapsed.label);
-  if (isStuck) statusLine += ' <span class="warn">⚠ 放置</span>';
+  if (pending.count > 0 && pendingAge != null && pendingAge >= PA_STALE_SECONDS) {
+    return {
+      actor: "pa",
+      note: "Teams通知 " + pending.count + "件が未送信",
+      warn: formatElapsed(pendingAge).replace("前", "") + " 滞留"
+    };
+  }
 
+  if (TERMINAL.includes(status)) return { actor: "done" };
+
+  const entry = STATUS_MAP[status] || ["system", issue.statusLabel || status, null, ""];
+  const age = secondsSince(issue.updatedAt);
+  let note = entry[1];
+  if (status === "failed" && issue.error) note += "：" + issue.error;
+  const warn = entry[2] != null && age != null && age >= entry[2] ? entry[3] : "";
+  return { actor: entry[0], note, warn };
+}
+
+function byUpdatedDesc(a, b) {
+  const ta = new Date(a.updatedAt || 0).getTime() || 0;
+  const tb = new Date(b.updatedAt || 0).getTime() || 0;
+  return tb - ta;
+}
+
+function buildLinks(issue) {
   const links = [];
   if (issue.issueUrl) links.push('<a href="' + escapeHtml(issue.issueUrl) + '" target="_blank" rel="noopener">Issue</a>');
   if (issue.pullRequestUrl) links.push('<a href="' + escapeHtml(issue.pullRequestUrl) + '" target="_blank" rel="noopener">PR</a>');
   if (issue.previewUrl) links.push('<a href="' + escapeHtml(issue.previewUrl) + '" target="_blank" rel="noopener">プレビュー</a>');
-  const linksHtml = links.length ? '<div class="links">' + links.join("") + "</div>" : "";
+  return links.length ? '<div class="links">' + links.join("") + "</div>" : "";
+}
 
+function buildCard(issue, result, actor) {
+  const [bg, border, text] = actor.color;
+  const elapsed = formatElapsed(secondsSince(issue.updatedAt));
+  const warnHtml = result.warn ? ' <span class="warn">' + escapeHtml(result.warn) + "</span>" : "";
   return (
     '<div class="card" style="background:' + bg + ';border-left-color:' + border + ';">' +
-    '<div class="card-title" style="color:' + textColor + ';">#' + issue.number + " " + escapeHtml(issue.title) + "</div>" +
-    '<div class="card-status" style="color:' + border + ';">' + statusLine + "</div>" +
-    linksHtml +
+    '<div class="card-title" style="color:' + text + ';">#' + issue.number + " " + escapeHtml(issue.title) + "</div>" +
+    '<div class="card-note" style="color:' + text + ';">' + escapeHtml(result.note) + warnHtml + "</div>" +
+    '<div class="card-meta">' + escapeHtml(elapsed) + " ・ " + escapeHtml(issue.status || "") + "</div>" +
+    buildLinks(issue) +
     "</div>"
   );
 }
 
+function renderLegend() {
+  document.getElementById("legend").innerHTML =
+    ACTORS.map(function (a) {
+      return '<span><span class="dot" style="background:' + a.color[1] + ';"></span>' +
+        escapeHtml(a.label) + "（" + escapeHtml(a.sub) + "）</span>";
+    }).join("") +
+    '<span><span class="warn">赤字</span>＝長時間そのまま</span>';
+}
+
 function render(data) {
-  const groups = {};
-  for (const [name] of PHASES) groups[name] = [];
-  for (const issue of data.issues || []) {
-    groups[phaseOf((issue.status || "").toLowerCase())].push(issue);
+  const groups = { human: [], cline: [], pa: [], system: [], done: [] };
+  const issues = (data.issues || []).slice().sort(byUpdatedDesc);
+
+  for (const issue of issues) {
+    const result = classify(issue);
+    groups[result.actor].push({ issue, result });
   }
 
   const board = document.getElementById("board");
-  board.innerHTML = "";
-
-  for (const [name] of PHASES) {
-    const items = groups[name];
-    const column = document.createElement("div");
-    const cardsHtml = items.length
-      ? items.map(buildCard).join("")
+  board.innerHTML = ACTORS.map(function (actor) {
+    const items = groups[actor.key];
+    const cards = items.length
+      ? items.map(function (item) { return buildCard(item.issue, item.result, actor); }).join("")
       : '<div class="empty">なし</div>';
-    column.innerHTML =
-      '<div class="column-title">' + escapeHtml(name) +
-      ' <span class="count">' + items.length + "</span></div>" +
-      cardsHtml;
-    board.appendChild(column);
-  }
+    return '<div><div class="column-title" style="color:' + actor.color[2] + ';">' +
+      escapeHtml(actor.label) + ' <span class="count">' + items.length + "</span></div>" + cards + "</div>";
+  }).join("");
+
+  const done = groups.done;
+  document.getElementById("done").innerHTML = done.length
+    ? done.map(function (item) {
+        const issue = item.issue;
+        const ok = issue.status === "completed";
+        return '<div class="done-row"><span>#' + issue.number + " " + escapeHtml(issue.title) + "</span>" +
+          '<span class="meta" style="color:' + (ok ? "#3B6D11" : "#888780") + ';">' +
+          escapeHtml(issue.statusLabel || issue.status) + " ・ " +
+          escapeHtml(formatElapsed(secondsSince(issue.updatedAt))) + "</span></div>";
+      }).join("")
+    : '<div class="empty">なし</div>';
 
   const generated = data.generatedAt ? new Date(data.generatedAt) : null;
   document.getElementById("updated").textContent =
     "最終更新: " + (generated ? generated.toLocaleString("ja-JP") : "不明") +
-    "（" + Math.round(POLL_INTERVAL_MS / 1000) + "秒ごとに自動更新）";
+    "（" + Math.round(POLL_INTERVAL_MS / 1000) + "秒ごとに自動更新・新しい順）";
   document.getElementById("error").style.display = "none";
 }
 
@@ -293,14 +379,14 @@ async function load() {
   try {
     const response = await fetch(DATA_URL + "?t=" + Date.now(), { cache: "no-store" });
     if (!response.ok) throw new Error("HTTP " + response.status);
-    const data = await response.json();
-    render(data);
+    render(await response.json());
   } catch (error) {
     document.getElementById("error").textContent = "データの取得に失敗しました: " + error.message;
     document.getElementById("error").style.display = "block";
   }
 }
 
+renderLegend();
 load();
 setInterval(load, POLL_INTERVAL_MS);
 </script>
@@ -308,23 +394,61 @@ setInterval(load, POLL_INTERVAL_MS);
 </html>
 """
 
+# バージョン番号を持たない初代テンプレート（v1）を識別するための目印。
+# これを含むファイルは「自動生成された旧版」とみなして置き換えてよい。
+_V1_SIGNATURE = 'const DATA_URL = "../data/agent/dashboard.json";'
 
-def ensure_agent_html(beta_repo) -> bool:
+
+def _installed_version(text: str) -> int | None:
+    """公開済みagent.htmlのバージョンを返す。自動生成版でなければNone。"""
+    match = re.search(
+        rf'<meta name="{_VERSION_META_NAME}" content="(\d+)">', text
+    )
+    if match:
+        return int(match.group(1))
+    if _V1_SIGNATURE in text:
+        return 1
+    return None
+
+
+def ensure_agent_html(beta_repo, logger=None) -> str:
     """
-    utility/agent.html が無ければ作成する。
+    utility/agent.html を用意する。戻り値は "created" / "updated" / "kept"。
 
-    既にある場合は上書きしない（手で調整されている可能性があるため）。
-    作成した場合は True を返す。
+    - 無ければ作成する
+    - 自動生成された古いバージョンなら、最新テンプレートで置き換える
+    - 手で作り替えられたファイル（バージョン情報も初代の目印も無いもの）や、
+      同じか新しいバージョンのものは触らない
+
+    自動生成版を手直しして、今後も上書きされたくない場合は、
+    ファイル先頭の agent-dashboard-version の meta タグを削除すること。
     """
     app_dir = beta_repo / APP_DIR_NAME
     app_dir.mkdir(parents=True, exist_ok=True)
     app_path = app_dir / APP_FILENAME
 
-    if app_path.exists():
-        return False
+    if not app_path.exists():
+        app_path.write_text(AGENT_HTML_TEMPLATE, encoding="utf-8")
+        return "created"
+
+    try:
+        current = app_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return "kept"
+
+    installed = _installed_version(current)
+    if installed is None:
+        if logger is not None:
+            logger.info(
+                f"{APP_DIR_NAME}/{APP_FILENAME} は手動で作り替えられているため上書きしません。"
+            )
+        return "kept"
+
+    if installed >= AGENT_HTML_VERSION:
+        return "kept"
 
     app_path.write_text(AGENT_HTML_TEMPLATE, encoding="utf-8")
-    return True
+    return "updated"
 
 
 # ============================================================
@@ -344,13 +468,22 @@ def publish_once(logger=LOGGER) -> bool:
         json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
     )
 
-    app_created = ensure_agent_html(beta_repo)
-    if app_created:
+    app_result = ensure_agent_html(beta_repo, logger=logger)
+    if app_result == "created":
         logger.info(f"{APP_DIR_NAME}/{APP_FILENAME} を新規作成しました。")
+    elif app_result == "updated":
+        logger.info(
+            f"{APP_DIR_NAME}/{APP_FILENAME} を新しい表示（v{AGENT_HTML_VERSION}）に更新しました。"
+        )
 
     message = f"dashboard: update data ({len(rows)} issues)"
-    if app_created:
+    if app_result == "created":
         message = f"dashboard: add {APP_FILENAME} + update data ({len(rows)} issues)"
+    elif app_result == "updated":
+        message = (
+            f"dashboard: update {APP_FILENAME} to v{AGENT_HTML_VERSION} "
+            f"+ update data ({len(rows)} issues)"
+        )
 
     pushed = commit_and_push(beta_repo, message)
     logger.info(f"ダッシュボードを{'更新' if pushed else '確認'}しました（{len(rows)}件）。")
@@ -409,8 +542,15 @@ def run_watch_loop(interval: int, logger=LOGGER) -> None:
     handler = StateChangeHandler()
     observer = Observer()
     observer.schedule(handler, str(CONFIG.state_dir), recursive=True)
+    # 未送信のTeams通知（Power Automate待ちの判定材料）の増減にも追従する。
+    # recursive=False なので、フロー④が reply/done/ へ移動した瞬間も
+    # 「reply/ からの移動」として検知できる。
+    observer.schedule(handler, str(CONFIG.reply_dir), recursive=False)
     observer.start()
-    logger.info(f"{CONFIG.state_dir} の変化を監視します。終了するには Ctrl+C を押してください。")
+    logger.info(
+        f"{CONFIG.state_dir} と {CONFIG.reply_dir} の変化を監視します。"
+        "終了するには Ctrl+C を押してください。"
+    )
 
     last_pushed_at = 0.0
 

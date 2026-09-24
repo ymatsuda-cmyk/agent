@@ -171,10 +171,60 @@ URL   : https://&lt;owner&gt;.github.io/tools-beta/utility/agent.html
   <code>agent_cli.py status</code> を直接使ってください。</li>
 <li><code>deploy_preview.py</code> と同じ <code>tools-beta</code> クローン・同じロックを
   使うため、プレビュー公開中でも安全に共存します。</li>
-<li>承認待ち（<code>waiting_approval</code>）が2時間、質問回答待ち
-  （<code>waiting_decision</code>）が1時間を超えると、カードに「⚠ 放置」と
-  表示されます。</li>
 </ul>
+<h3 id="表示の見方担当者別カンバン">表示の見方（担当者別カンバン）</h3>
+<p>列は「状態」ではなく<strong>「今だれ待ちか」</strong>で分かれています。各列の中と、
+下部の「終了」一覧は、最終更新が新しい順に並びます。</p>
+<table>
+<thead>
+<tr>
+<th>列</th>
+<th>含まれる状態</th>
+<th>意味</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>人の対応待ち</td>
+<td><code>waiting_decision</code> <code>waiting_approval</code> <code>failed</code></td>
+<td>Teamsでの回答・承認、または停止したIssueへの修正指示（<code>agent_cli.py rework</code>）が必要</td>
+</tr>
+<tr>
+<td>Cline作業中</td>
+<td><code>implementing</code></td>
+<td>VS Code上でClineが実装中</td>
+</tr>
+<tr>
+<td>自動連携待ち</td>
+<td>（状態に関係なく）未送信の通知が3分以上残っている</td>
+<td>Power AutomateがTeamsへまだ送っていない</td>
+</tr>
+<tr>
+<td>システム処理中</td>
+<td><code>created</code> <code>queued</code> <code>rework</code> <code>preview_deploying</code> <code>approved</code></td>
+<td>Pythonの着手・公開・マージ処理中</td>
+</tr>
+</tbody>
+</table>
+<p>長時間そのままのものは赤字で警告します（Cline作業中が1時間超で
+「長時間・停止の可能性」、質問回答待ち1時間超・承認待ち2時間超で
+「放置」、システム処理中が30分超で「停滞」）。</p>
+<p><strong>「自動連携待ち」の判定方法と限界</strong>: フロー④（reply→Teams）は投稿後に
+<code>reply/done/</code> へファイルを移動するので、<code>reply/</code> に3分以上残っている通知が
+あれば「Power Automateが止まっている/遅れている」と判定できます。
+一方、質問カード（フロー②）と承認カード（フロー③）は、Teamsへ投稿済みか
+どうかをファイルから観測する手段がありません。そのため <code>waiting_decision</code>
+<code>waiting_approval</code> は常に「人の対応待ち」として表示され、カード自体が
+Teamsに届いていないケースとは区別できません。区別したい場合は、
+フロー②③の最後に「投稿完了」を示すファイルを書き出す（または
+<code>question/</code>・<code>waiting/</code> のファイルを <code>done/</code> へ移動する）処理を追加する
+必要があります。</p>
+<p><strong>表示HTMLの更新</strong>: <code>utility/agent.html</code> は <code>dashboard_agent.py</code> 内の
+テンプレートから生成され、テンプレートのバージョン（<code>AGENT_HTML_VERSION</code>）が
+上がると、公開済みの自動生成版は次回の更新時に自動で置き換わります。
+手で作り替えたファイル（バージョン情報のmetaタグが無いもの）は上書きしません。
+自動生成版を手直しして今後も上書きされたくない場合は、ファイル先頭の
+<code>&lt;meta name="agent-dashboard-version" ...&gt;</code> を削除してください。</p>
 <h2 id="3-よくあるトラブル">3. よくあるトラブル</h2>
 <h3 id="request-question-state-などのフォルダが意図しない場所リポジトリ直下などにできている"><code>request</code> <code>question</code> <code>state</code> などのフォルダが、意図しない場所（リポジトリ直下など）にできている</h3>
 <p><strong>症状</strong>: <code>AGENT_ROOT</code>（OneDrive上のはず）ではなく、

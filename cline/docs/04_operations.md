@@ -94,9 +94,40 @@ URL   : https://<owner>.github.io/tools-beta/utility/agent.html
   `agent_cli.py status` を直接使ってください。
 - `deploy_preview.py` と同じ `tools-beta` クローン・同じロックを
   使うため、プレビュー公開中でも安全に共存します。
-- 承認待ち（`waiting_approval`）が2時間、質問回答待ち
-  （`waiting_decision`）が1時間を超えると、カードに「⚠ 放置」と
-  表示されます。
+
+### 表示の見方（担当者別カンバン）
+
+列は「状態」ではなく**「今だれ待ちか」**で分かれています。各列の中と、
+下部の「終了」一覧は、最終更新が新しい順に並びます。
+
+| 列 | 含まれる状態 | 意味 |
+| --- | --- | --- |
+| 人の対応待ち | `waiting_decision` `waiting_approval` `failed` | Teamsでの回答・承認、または停止したIssueへの修正指示（`agent_cli.py rework`）が必要 |
+| Cline作業中 | `implementing` | VS Code上でClineが実装中 |
+| 自動連携待ち | （状態に関係なく）未送信の通知が3分以上残っている | Power AutomateがTeamsへまだ送っていない |
+| システム処理中 | `created` `queued` `rework` `preview_deploying` `approved` | Pythonの着手・公開・マージ処理中 |
+
+長時間そのままのものは赤字で警告します（Cline作業中が1時間超で
+「長時間・停止の可能性」、質問回答待ち1時間超・承認待ち2時間超で
+「放置」、システム処理中が30分超で「停滞」）。
+
+**「自動連携待ち」の判定方法と限界**: フロー④（reply→Teams）は投稿後に
+`reply/done/` へファイルを移動するので、`reply/` に3分以上残っている通知が
+あれば「Power Automateが止まっている/遅れている」と判定できます。
+一方、質問カード（フロー②）と承認カード（フロー③）は、Teamsへ投稿済みか
+どうかをファイルから観測する手段がありません。そのため `waiting_decision`
+`waiting_approval` は常に「人の対応待ち」として表示され、カード自体が
+Teamsに届いていないケースとは区別できません。区別したい場合は、
+フロー②③の最後に「投稿完了」を示すファイルを書き出す（または
+`question/`・`waiting/` のファイルを `done/` へ移動する）処理を追加する
+必要があります。
+
+**表示HTMLの更新**: `utility/agent.html` は `dashboard_agent.py` 内の
+テンプレートから生成され、テンプレートのバージョン（`AGENT_HTML_VERSION`）が
+上がると、公開済みの自動生成版は次回の更新時に自動で置き換わります。
+手で作り替えたファイル（バージョン情報のmetaタグが無いもの）は上書きしません。
+自動生成版を手直しして今後も上書きされたくない場合は、ファイル先頭の
+`<meta name="agent-dashboard-version" ...>` を削除してください。
 
 ## 3. よくあるトラブル
 
