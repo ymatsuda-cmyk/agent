@@ -6,7 +6,7 @@
 # 起動 / 停止
 cd C:\repo\agent\cline
 .\.venv\Scripts\Activate.ps1
-powershell -ExecutionPolicy Bypass -File .\scripts\start_all.ps1 -Parallel 3
+powershell -ExecutionPolicy Bypass -File .\scripts\start_all.ps1 -Parallel 3 -Dashboard
 powershell -ExecutionPolicy Bypass -File .\scripts\stop_all.ps1
 
 # 状態確認

@@ -159,6 +159,8 @@ setx GITHUB_TOKEN "github_pat_xxxxxxxxxxxx"
 | `AGENT_GUI_MODE` | | `auto` | `manual` にすると手動貼り付け |
 | `AGENT_CLINE_INPUT_X` | | `1500` | Cline入力欄のX座標 |
 | `AGENT_CLINE_INPUT_Y` | | `900` | Cline入力欄のY座標 |
+| `AGENT_CLINE_TAB_X` | | `1240` | Clineタブの座標（他の拡張とタブ共有時のみ使用） |
+| `AGENT_CLINE_TAB_Y` | | `50` | 同上。`0`（既定）ならタブクリックをスキップする |
 | `AGENT_IMPLEMENTATION_TIMEOUT` | | `1800` | 実装待ち秒数 |
 | `AGENT_DECISION_TIMEOUT` | | `7200` | 回答待ち秒数 |
 | `AGENT_GUI_LOCK_TIMEOUT` | | `1800` | GUIロック待ち秒数 |
@@ -178,6 +180,14 @@ python agent\agent_cli.py test-click
 5秒後に指定座標をクリックして文字を打ちます。
 入力欄に入らない場合は、Windowsの「拡大縮小」が100%か確認し、
 `AGENT_CLINE_INPUT_X` / `AGENT_CLINE_INPUT_Y` を調整してください。
+
+**Claude Codeなど、他の拡張機能とサイドバーのタブを共有している場合**、
+VS Code起動直後はCline以外のタブがアクティブなことがあり、
+入力欄をクリックしても実際にはCline以外の場所に貼り付けてしまいます。
+その場合は `AGENT_CLINE_TAB_X` / `AGENT_CLINE_TAB_Y` に、
+Clineタブ自体の座標を設定してください。入力欄をクリックする前に、
+自動でこのタブへ切り替えるようになります。未設定（既定値`0`）の場合は
+タブ切り替えを行いません。
 
 > 座標指定が安定しない環境では `AGENT_GUI_MODE=manual` を推奨します。
 > Ctrl+V → Enter の2操作だけ人が行う運用になり、並走も問題なく動きます。
