@@ -94,6 +94,21 @@ def test_build_decision_prompt_falls_back_to_id_when_choice_unknown():
     assert "unknown_id" in text
 
 
+def test_question_contract_explicitly_prohibits_ask_followup_question():
+    """
+    実環境の検証で、Clineが標準搭載の対話型質問ツール(ask_followup_question)を
+    呼んで停止してしまい、Teams経由の質問応答フローに乗らず会話が
+    止まったままになる事例があった。契約文にこれを名指しで禁止する
+    一文が含まれ、代わりに通常のテキストで応答を終えるよう指示していること。
+    """
+    text = prompt.build_implementation_prompt(
+        _sample_issue(), "b", "/w", "https://x/"
+    )
+    assert "ask_followup_question" in text
+    assert "絶対に使用しないでください" in text
+    assert "質問を作成しました。回答を待機します" in text
+
+
 def test_summary_contract_instructs_reporting_even_on_early_stop():
     """
     実環境の検証で、チャットへ「これ以上の検証は不要です」と直接指示したところ、

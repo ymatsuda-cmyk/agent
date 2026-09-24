@@ -233,3 +233,160 @@ def test_read_summary_deletes_summary_file_after_reading(agent_env):
     summary = worker.read_summary()
     assert summary["summaryText"] == "完了"
     assert not worker.summary_file.exists()
+
+
+# ============================================================
+# run(): 未回答の質問が残ったまま再実行された場合、
+# 実装プロンプトを再送しない安全策（回帰テスト）
+#
+# 実運用で、途中で止まった/再起動されたIssueがorchestratorに
+# 再度拾われた際、Cline側のウィンドウには前回の未回答の質問
+# （.agent-question.json、場合によってはCline標準の対話質問UI）が
+# まだ残っている状態で、mode="new"の実装プロンプトを誤って
+# 貼り付けてしまうと、その未回答質問への回答として誤爆する。
+# ============================================================
+
+def _prepared_worker(issue_number: int, mode: str = "new") -> Worker:
+    """prepare()を済ませ、worktreeを実際に作った状態のWorkerを返す。"""
+    worker = _worker(issue_number, mode=mode)
+    worker.worktree.mkdir(parents=True, exist_ok=True)
+    return worker
+
+
+def test_run_does_not_resend_prompt_when_valid_question_is_pending(monkeypatch, agent_env):
+    worker = _prepared_worker(66, mode="new")
+
+    worker.question_file.write_text(
+        json.dumps(
+            {
+                "issueNumber": 66,
+                "questionId": "q1",
+                "question": "前回の未回答質問",
+                "choices": [{"id": "c1", "title": "A"}],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(Worker, "prepare", lambda self: True)
+    monkeypatch.setattr("implement_agent.teams.notify_started", lambda *a, **k: None)
+
+    send_calls = []
+    monkeypatch.setattr(
+        Worker, "send_to_cline",
+        lambda self, text, first_time=False: send_calls.append((text, first_time)),
+    )
+    monkeypatch.setattr(Worker, "wait_for_implementation", lambda self: False)
+
+    worker.run()
+
+    # 未回答の質問が残っている間は、実装プロンプトを再送しないこと
+    assert send_calls == []
+    # 質問ファイル自体は消さず、そのまま残しておくこと
+    assert worker.question_file.exists()
+
+
+def test_run_resends_prompt_normally_when_no_pending_question(monkeypatch, agent_env):
+    worker = _prepared_worker(67, mode="new")
+    # 質問ファイルは存在しない（通常の初回実行）
+
+    monkeypatch.setattr(Worker, "prepare", lambda self: True)
+    monkeypatch.setattr("implement_agent.teams.notify_started", lambda *a, **k: None)
+
+    send_calls = []
+    monkeypatch.setattr(
+        Worker, "send_to_cline",
+        lambda self, text, first_time=False: send_calls.append((text, first_time)),
+    )
+    monkeypatch.setattr(Worker, "wait_for_implementation", lambda self: False)
+
+    worker.run()
+
+    # 質問が残っていなければ、通常通り初回プロンプトを送ること
+    assert len(send_calls) == 1
+    assert send_calls[0][1] is True  # first_time=True
+
+
+def test_run_resends_prompt_when_leftover_question_is_invalid(monkeypatch, agent_env):
+    """
+    question_fileが存在しても、別Issue宛て等の無効な内容なら
+    read_question()がNoneを返す。この場合は通常どおりクリアして再送する
+    （無効なファイルのせいで永久に再送できなくなることを防ぐ）。
+    """
+    worker = _prepared_worker(68, mode="new")
+
+    worker.question_file.write_text(
+        json.dumps({"issueNumber": 999, "choices": [{"id": "c1"}]}),  # 別Issue宛て
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(Worker, "prepare", lambda self: True)
+    monkeypatch.setattr("implement_agent.teams.notify_started", lambda *a, **k: None)
+
+    send_calls = []
+    monkeypatch.setattr(
+        Worker, "send_to_cline",
+        lambda self, text, first_time=False: send_calls.append((text, first_time)),
+    )
+    monkeypatch.setattr(Worker, "wait_for_implementation", lambda self: False)
+
+    worker.run()
+
+    assert len(send_calls) == 1
+    assert send_calls[0][1] is True
+    # 無効な質問ファイルはクリアされていること
+    assert not worker.question_file.exists()
+
+
+def test_run_rework_mode_always_archives_question_and_resends(monkeypatch, agent_env):
+    """再実装(mode="rework")では、質問の有無に関わらず既存挙動（クリアして再送）のまま。"""
+    worker = _prepared_worker(69, mode="rework")
+    worker.question_file.write_text(
+        json.dumps({"issueNumber": 69, "choices": [{"id": "c1"}]}), encoding="utf-8"
+    )
+
+    monkeypatch.setattr(Worker, "prepare", lambda self: True)
+    monkeypatch.setattr("implement_agent.teams.notify_started", lambda *a, **k: None)
+
+    send_calls = []
+    monkeypatch.setattr(
+        Worker, "send_to_cline",
+        lambda self, text, first_time=False: send_calls.append((text, first_time)),
+    )
+    monkeypatch.setattr(Worker, "wait_for_implementation", lambda self: False)
+
+    worker.run()
+
+    assert len(send_calls) == 1
+    assert not worker.question_file.exists()
+
+
+# ============================================================
+# ensure_draft_pr(): 既存PR再利用時に本文を最新化する（回帰テスト）
+# ============================================================
+
+def test_ensure_draft_pr_updates_body_when_reusing_existing_pr(monkeypatch, agent_env):
+    worker = _prepared_worker(69, mode="new")
+
+    existing_pr = {"number": 69, "url": "https://github.com/x/y/pull/69"}
+    monkeypatch.setattr("implement_agent.ghcli.find_open_pr", lambda branch: existing_pr)
+
+    update_calls = []
+    monkeypatch.setattr(
+        "implement_agent.ghcli.update_pull_request_body",
+        lambda pr_number, body: update_calls.append((pr_number, body)),
+    )
+
+    summary = {
+        "implementation": ["再実装で直した内容"],
+        "verification": [],
+        "notPerformed": [],
+    }
+    pr_number, pr_url = worker.ensure_draft_pr(summary, ["index.html"])
+
+    assert pr_number == 69
+    assert pr_url == "https://github.com/x/y/pull/69"
+    assert len(update_calls) == 1
+    assert update_calls[0][0] == 69
+    assert "再実装で直した内容" in update_calls[0][1]

@@ -107,3 +107,152 @@ def test_launch_vscode_calls_maximize_with_issue_number(monkeypatch, tmp_path):
 
     assert result is True
     assert called == [(68,)]
+
+
+# ============================================================
+# launch_vscode: 信頼確認ダイアログの回避（--disable-workspace-trust）
+#
+# worktreeは毎回新規フォルダなので、VS Codeが「このフォルダを信頼しますか」
+# ダイアログを出し、Clineの入力欄を塞いで自動投入が失敗する事例が
+# 実環境の検証で実際に発生した。
+# ============================================================
+
+
+def test_launch_vscode_passes_disable_workspace_trust_flag(monkeypatch, tmp_path):
+    monkeypatch.setattr(cline.shutil, "which", lambda name: "/usr/bin/code")
+    monkeypatch.setattr(cline.time, "sleep", lambda s: None)
+
+    captured_commands = []
+    monkeypatch.setattr(
+        cline.subprocess, "Popen",
+        lambda command, **kwargs: captured_commands.append(command),
+    )
+
+    cline.launch_vscode(tmp_path)
+
+    assert captured_commands
+    assert "--disable-workspace-trust" in captured_commands[0]
+
+
+# ============================================================
+# copy_to_clipboard: 他プロセスがクリップボードを握っている場合のリトライ
+# ============================================================
+
+
+def test_copy_to_clipboard_retries_then_succeeds(monkeypatch):
+    import sys
+    import types
+
+    attempts = {"count": 0}
+
+    def flaky_copy(text):
+        attempts["count"] += 1
+        if attempts["count"] < 2:
+            raise RuntimeError("OpenClipboard failed (別プロセスが使用中)")
+
+    fake_pyperclip = types.ModuleType("pyperclip")
+    fake_pyperclip.copy = flaky_copy
+    monkeypatch.setitem(sys.modules, "pyperclip", fake_pyperclip)
+    monkeypatch.setattr(cline.time, "sleep", lambda s: None)
+
+    result = cline.copy_to_clipboard("プロンプト本文")
+
+    assert result is True
+    assert attempts["count"] == 2  # 1回失敗し、2回目で成功
+
+
+def test_copy_to_clipboard_gives_up_after_max_retries(monkeypatch):
+    import sys
+    import types
+
+    def always_fails(text):
+        raise RuntimeError("OpenClipboard failed")
+
+    fake_pyperclip = types.ModuleType("pyperclip")
+    fake_pyperclip.copy = always_fails
+    monkeypatch.setitem(sys.modules, "pyperclip", fake_pyperclip)
+    monkeypatch.setattr(cline.time, "sleep", lambda s: None)
+
+    result = cline.copy_to_clipboard("プロンプト本文")
+
+    assert result is False
+
+
+def test_inject_prompt_aborts_when_clipboard_copy_fails(monkeypatch):
+    monkeypatch.setattr(cline, "copy_to_clipboard", lambda text, logger=None: False)
+    monkeypatch.setattr(
+        cline, "focus_window",
+        lambda *a, **k: (_ for _ in ()).throw(AssertionError("クリップボード失敗時はfocus_windowを呼ばないはず")),
+    )
+
+    result = cline.inject_prompt(68, "テストプロンプト")
+
+    assert result is False
+
+
+# ============================================================
+# Clineタブ切り替え（他の拡張機能とタブを共有している場合の対策）
+# ============================================================
+
+
+def test_inject_prompt_clicks_cline_tab_before_input_when_configured(monkeypatch):
+    from agent_core.config import CONFIG
+
+    monkeypatch.setattr(CONFIG, "cline_tab_x", 1240)
+    monkeypatch.setattr(CONFIG, "cline_tab_y", 50)
+    monkeypatch.setattr(CONFIG, "cline_input_x", 1500)
+    monkeypatch.setattr(CONFIG, "cline_input_y", 900)
+
+    monkeypatch.setattr(cline, "copy_to_clipboard", lambda text, logger=None: True)
+    monkeypatch.setattr(cline, "focus_window", lambda *a, **k: True)
+    monkeypatch.setattr(cline.time, "sleep", lambda s: None)
+    monkeypatch.setattr(cline, "_set_cursor_pos", lambda x, y: None)
+
+    clicked_points = []
+
+    import sys
+    import types
+
+    fake_pyautogui = types.ModuleType("pyautogui")
+    fake_pyautogui.FAILSAFE = False
+    fake_pyautogui.click = lambda x, y: clicked_points.append((x, y))
+    fake_pyautogui.hotkey = lambda *a: None
+    fake_pyautogui.press = lambda *a: None
+    monkeypatch.setitem(sys.modules, "pyautogui", fake_pyautogui)
+
+    cline.inject_prompt(68, "テストプロンプト")
+
+    # タブ座標 → 入力欄座標の順でクリックされていること
+    assert clicked_points[0] == (1240, 50)
+    assert clicked_points[1] == (1500, 900)
+
+
+def test_inject_prompt_skips_tab_click_when_not_configured(monkeypatch):
+    from agent_core.config import CONFIG
+
+    monkeypatch.setattr(CONFIG, "cline_tab_x", 0)
+    monkeypatch.setattr(CONFIG, "cline_tab_y", 0)
+    monkeypatch.setattr(CONFIG, "cline_input_x", 1500)
+    monkeypatch.setattr(CONFIG, "cline_input_y", 900)
+
+    monkeypatch.setattr(cline, "copy_to_clipboard", lambda text, logger=None: True)
+    monkeypatch.setattr(cline, "focus_window", lambda *a, **k: True)
+    monkeypatch.setattr(cline.time, "sleep", lambda s: None)
+    monkeypatch.setattr(cline, "_set_cursor_pos", lambda x, y: None)
+
+    clicked_points = []
+
+    import sys
+    import types
+
+    fake_pyautogui = types.ModuleType("pyautogui")
+    fake_pyautogui.FAILSAFE = False
+    fake_pyautogui.click = lambda x, y: clicked_points.append((x, y))
+    fake_pyautogui.hotkey = lambda *a: None
+    fake_pyautogui.press = lambda *a: None
+    monkeypatch.setitem(sys.modules, "pyautogui", fake_pyautogui)
+
+    cline.inject_prompt(68, "テストプロンプト")
+
+    # タブ未設定なら、入力欄への1回だけクリックされること
+    assert clicked_points == [(1500, 900)]
