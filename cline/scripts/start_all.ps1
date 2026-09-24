@@ -14,14 +14,22 @@
     起動元の環境次第で別の仮想環境を誤って掴む。実際にこれが原因で、
     別プロジェクトのvenvから常駐エージェントが二重起動した事例がある）。
 
+    -Dashboard を付けると、Issue状態ダッシュボード（dashboard_agent.py）も
+    起動する。tools-beta（GitHub Pages）へ公開するため、既定ではオフに
+    している（URLを知っていれば誰でも閲覧できるため、既定でオンにはしない）。
+
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File .\start_all.ps1 -Parallel 3
+
+.EXAMPLE
+    powershell -ExecutionPolicy Bypass -File .\start_all.ps1 -Parallel 3 -Dashboard
 #>
 
 param(
     [int]$Parallel = 0,
     [switch]$NoVsCode,
-    [switch]$Manual
+    [switch]$Manual,
+    [switch]$Dashboard
 )
 
 $ErrorActionPreference = "Stop"
@@ -66,6 +74,10 @@ if ($Manual)         { $orchestratorArgs += "--manual" }
 Start-Agent -Title "AGENT: orchestrator" -Script "orchestrator.py" -Arguments $orchestratorArgs
 Start-Agent -Title "AGENT: approval" -Script "approval_agent.py" -Arguments @()
 
+if ($Dashboard) {
+    Start-Agent -Title "AGENT: dashboard" -Script "dashboard_agent.py" -Arguments @()
+}
+
 Write-Host ""
-Write-Host "3つのウィンドウが起動しました。"
+Write-Host "$(if ($Dashboard) { '4' } else { '3' })つのウィンドウが起動しました。"
 Write-Host "状態確認: & '$venvPython' agent\agent_cli.py status"

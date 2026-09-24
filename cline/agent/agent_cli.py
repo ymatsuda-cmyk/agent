@@ -7,6 +7,7 @@
     python agent_cli.py retry 12        Issue #12 を着手待ちへ戻す
     python agent_cli.py approve 12      手動で承認する
     python agent_cli.py reject 12       手動で却下する
+    python agent_cli.py rework 12 "指示" 修正指示を出して同じworktreeで再実装させる
     python agent_cli.py unlock          残存ロックを掃除する
     python agent_cli.py clean-worktrees 不要なworktreeを掃除する
     python agent_cli.py test-click      Cline入力欄の座標を確認する
@@ -109,6 +110,29 @@ def command_decision(args, approve: bool) -> int:
         "--approve" if approve else "--reject",
     ]
     return subprocess.call(command, cwd=str(SCRIPT_DIR))
+
+
+def command_rework(args) -> int:
+    """
+    修正指示を出して再実装させる。
+
+    Teamsの承認カードで「再実装」を押したときに動く処理
+    （approval_agent.handle_rework）をそのまま呼び出す。
+    そのため、承認カードが既に無い状態（failed等）からでも、
+    同じブランチ・同じworktreeでClineへ修正指示を再送できる。
+    """
+    from approval_agent import handle_rework
+
+    handle_rework(args.issue, args.comment)
+
+    print(f"Issue #{args.issue} を再実装待ち(rework)へ戻しました。")
+    print("orchestratorが起動していれば、自動的に拾われて再開します。")
+    print("起動していなければ、次で単体実行できます:")
+    print(
+        f"  python orchestrator.py --once --min-issue {args.issue} "
+        f"--max-issue {args.issue}"
+    )
+    return 0
 
 
 def command_unlock(args) -> int:
@@ -273,6 +297,11 @@ def main() -> int:
     p = sub.add_parser("reject", help="手動却下")
     p.add_argument("issue", type=int)
     p.set_defaults(func=lambda a: command_decision(a, False))
+
+    p = sub.add_parser("rework", help="修正指示を出して再実装させる（同じブランチ・worktreeで再開）")
+    p.add_argument("issue", type=int)
+    p.add_argument("comment", help="Clineへの修正指示（そのままプロンプトに使われます）")
+    p.set_defaults(func=command_rework)
 
     p = sub.add_parser("unlock", help="ロックの掃除")
     p.add_argument("--force", action="store_true")

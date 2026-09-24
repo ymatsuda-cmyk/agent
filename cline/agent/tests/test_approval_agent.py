@@ -100,3 +100,111 @@ def test_handle_rework_writes_rework_file_into_worktree(agent_env):
 
     rework_file = worktree / ".agent-rework.txt"
     assert rework_file.read_text(encoding="utf-8") == "修正指示テキスト"
+
+
+# ============================================================
+# read_waiting_detail / build_result_comment
+# （承認カードの内容をGitHub Issueコメントとしても残す機能）
+# ============================================================
+
+def test_read_waiting_detail_reads_waiting_json(agent_env):
+    from agent_core.jsonio import write_json
+
+    write_json(
+        CONFIG.waiting_dir / "issue-68.json",
+        {"issueNumber": 68, "summaryText": "疎通確認の実装完了"},
+    )
+
+    detail = aa.read_waiting_detail(68)
+    assert detail["summaryText"] == "疎通確認の実装完了"
+
+
+def test_read_waiting_detail_returns_empty_dict_when_missing(agent_env):
+    assert aa.read_waiting_detail(999) == {}
+
+
+def test_build_result_comment_includes_action_label_and_sections():
+    comment = aa.build_result_comment(
+        "approve", {"summaryText": "実装完了報告"}, rework_comment=""
+    )
+    assert "承認" in comment
+    assert "実装完了報告" in comment
+
+
+def test_build_result_comment_includes_rework_heading():
+    comment = aa.build_result_comment(
+        "rework", {"summaryText": "内容"}, rework_comment="色を変えて"
+    )
+    assert "修正指示" in comment
+    assert "色を変えて" in comment
+
+
+# ============================================================
+# _process_inner: 承認結果をGitHub Issueコメントとしても
+# 投稿すること（回帰テスト）
+# ============================================================
+
+def test_process_inner_posts_github_comment_on_approve(agent_env, monkeypatch):
+    from agent_core.jsonio import write_json
+
+    statefile.create(68, {"status": statefile.Status.WAITING_APPROVAL})
+    write_json(
+        CONFIG.waiting_dir / "issue-68.json",
+        {"issueNumber": 68, "summaryText": "実装完了報告テキスト"},
+    )
+    path = CONFIG.approval_dir / "issue-68.json"
+    write_json(path, {"issueNumber": 68, "action": "approve"})
+
+    comments = []
+    monkeypatch.setattr(aa.ghcli, "comment_issue", lambda issue, body: comments.append((issue, body)))
+    monkeypatch.setattr(aa, "handle_approve", lambda issue: None)
+    notify_calls = []
+    monkeypatch.setattr(
+        aa.teams, "notify_decision",
+        lambda *a, **k: notify_calls.append((a, k)),
+    )
+
+    aa._process_inner(path)
+
+    assert len(comments) == 1
+    assert comments[0][0] == 68
+    assert "実装完了報告テキスト" in comments[0][1]
+    assert len(notify_calls) == 1
+
+
+def test_process_inner_skips_double_processing_of_archived_issue(agent_env, monkeypatch):
+    """
+    stateが既にdone/へアーカイブ済み(=完了済み)のIssueに対して、
+    重複した承認結果ファイルが届いても再処理しないこと。
+    """
+    from agent_core.jsonio import write_json
+
+    statefile.create(70, {"status": statefile.Status.COMPLETED})
+    statefile.archive(70)
+    assert statefile.status_of(70) == ""  # state本体はもう無い
+
+    path = CONFIG.approval_dir / "issue-70.json"
+    write_json(path, {"issueNumber": 70, "action": "approve"})
+
+    called = []
+    monkeypatch.setattr(aa, "handle_approve", lambda issue: called.append(issue))
+
+    aa._process_inner(path)
+
+    assert called == []
+    assert not path.exists()  # done へ退避されている
+
+
+def test_process_inner_does_not_post_comment_for_unknown_action(agent_env, monkeypatch):
+    from agent_core.jsonio import write_json
+
+    statefile.create(71, {"status": statefile.Status.WAITING_APPROVAL})
+    path = CONFIG.approval_dir / "issue-71.json"
+    write_json(path, {"issueNumber": 71, "action": "invalid_action"})
+
+    comments = []
+    monkeypatch.setattr(aa.ghcli, "comment_issue", lambda issue, body: comments.append((issue, body)))
+
+    aa._process_inner(path)
+
+    assert comments == []

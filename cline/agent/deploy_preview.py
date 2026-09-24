@@ -228,8 +228,8 @@ def deploy(issue_number: int, worktree: pathlib.Path, changed_files: list[str]) 
 
     return {
         "status": "deployed" if pushed else "unchanged",
-        "issueNumber": issue_number,, preview_root
-        "previewUrl": build_preview_url(issue_number, changed_files),
+        "issueNumber": issue_number,
+        "previewUrl": build_preview_url(issue_number, changed_files, preview_root),
         "files": changed_files,
     }
 

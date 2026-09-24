@@ -4,9 +4,7 @@
 
 ```powershell
 # 起動 / 停止
-cd C:\repo\agent\cline
-.\.venv\Scripts\Activate.ps1
-powershell -ExecutionPolicy Bypass -File .\scripts\start_all.ps1 -Parallel 3 -Dashboard
+powershell -ExecutionPolicy Bypass -File .\scripts\start_all.ps1 -Parallel 3
 powershell -ExecutionPolicy Bypass -File .\scripts\stop_all.ps1
 
 # 状態確認
@@ -205,28 +203,38 @@ $content = Get-Content .\scripts\setup.ps1 -Raw -Encoding UTF8
 )
 ```
 
-### `pytest` で無関係なテストが失敗する（前のテストのIssueが残っている）
+### `pytest` を実行すると、本番のOneDrive上にテストのIssueが混入する（原因確定・修正済み）
 
-`test_statefile.py` や `test_gitops.py` で、作った覚えのないIssue番号が
-状態に混ざっている・想定より多いテストが失敗する場合、テスト間の
-隔離が壊れています。まず次を実行し、どちらで失敗するか確認してください。
+**症状**: `agent_cli.py status` や生成されたダッシュボードに、
+タイトルが `"t"` や `"却下されたIssue"` など、実際に依頼した覚えのない
+Issueが表示される。
+
+**原因**: `Config` は `state` フォルダ等を個別に上書きできる
+（`AGENT_STATE_DIR` 等、`docs/02_setup.md` 参照）。この上書きは
+`AGENT_ROOT` より優先される。もし実行環境（Windowsのユーザー環境変数）に
+`AGENT_STATE_DIR` が過去の設定作業などで実際に残っていると、
+テストが `AGENT_ROOT` をどれだけ一時フォルダへ差し替えても、
+**`state` フォルダだけは常に本番のOneDriveを指し続ける。**
+テストのフィクスチャは以前 `AGENT_ROOT` 等の主要な変数しか
+上書きしておらず、この個別上書きキーには無防備だった。
+
+**対策（修正済み）**: `agent/tests/conftest.py` の `agent_env`
+フィクスチャは、`AGENT_ROOT` を設定する前に、`STATE_FOLDERS` の
+個別上書きキー（`AGENT_REQUEST_DIR` `AGENT_STATE_DIR` 等）を
+すべて明示的に削除するようにした。実行環境にこれらが実在していても、
+テスト中は無視される。
+
+**もし既にこの経路で本番stateが汚染されている場合**:
 
 ```powershell
-pytest agent\tests\test_isolation_diagnostic.py -v
+Get-ChildItem Env: | Where-Object { $_.Name -like 'AGENT_*' }
 ```
 
-- **2件とも通る** → 単体では正しく隔離されている。他のテストファイルとの
-  組み合わせでのみ再現する可能性が高いので、`pytest agent -v` の完全な
-  出力をそのまま報告してください。
-- **`test_isolation_diagnostic_second` が失敗する** → `agent_env`
-  フィクスチャ自体の隔離が機能していません。表示される
-  `AssertionError` のメッセージ全文（`CONFIG.agent_root` の期待値・実際値、
-  または既存Issueファイルの一覧）をそのまま報告してください。
-  原因を特定して修正します。
-
-これはWindows特有の環境要因（アンチウイルス、OneDrive同期、
-pytestやPythonのバージョンの組み合わせなど）が疑われますが、
-Linux環境では再現しておらず未特定です。
+`AGENT_STATE_DIR` 等が実際に設定されていたら削除する
+（`[Environment]::SetEnvironmentVariable("AGENT_STATE_DIR", $null, "User")`）。
+そのうえで、`state/` に紛れ込んだテスト由来のIssue
+（タイトルが `"t"` 等、明らかにテストコードのものだと分かるもの）を
+個別に削除する。
 
 ### Issueが二重に作られる
 
@@ -304,6 +312,31 @@ Cline側の再発防止としては、プロンプトの
 「ファイルはUTF-8 BOMなしで保存してください」を守らせることと、
 VS Codeの `files.encoding` を `utf8` にしておくことです。
 
+### 静的チェック不合格（`failed`）から、Teamsを介さず修正を指示したい
+
+`check_static()`（HTMLタグ対応・リンク切れ）で `failed` になったIssueは、
+承認カードが既に消費済みで「再実装」ボタンが使えない。
+`agent_cli.py rework` は、承認カードの「再実装」ボタンと**全く同じ処理**
+（`approval_agent.handle_rework`）を直接呼び出すコマンドで、承認カード無しに
+同じブランチ・同じworktreeでClineへ修正指示を出せる。
+
+```powershell
+python agent\agent_cli.py rework 77 "clipstock/index.htmlのHTMLタグの対応が壊れています。閉じタグに対応する開始タグが7箇所見つかりませんでした。修正してください。修正が終わったら教えてください。"
+```
+
+`status` が `rework` に戻り、常駐している `orchestrator` が拾って
+自動的に再開する。常駐していなければ次で単体実行できる。
+
+```powershell
+python agent\orchestrator.py --once --min-issue 77 --max-issue 77
+```
+
+**Teamsに自由なテキストを打ち込んで、それを特定のIssueへの追加指示として
+自動で拾う経路は、現時点では無い。** 依頼チャネルへの新規投稿は別のIssueを
+作るだけで、既存のworktree/ブランチは再利用されない。この用途で
+Teams発の自由入力を使えるようにするには、別途Power Automateフローの
+追加が必要（`rework`と同じ状態遷移をトリガーする新しいフロー）。
+
 ## 4. 障害時の復旧
 
 プロセスが落ちても、`state/issue-<N>.json` に状態が残っています。
@@ -380,6 +413,11 @@ python agent\agent_cli.py retry 12
 | 夜間だけ動かす | `orchestrator.py` を Windows タスクスケジューラで起動/停止 |
 | Cline以外のコーディングAI | `agent_core/cline.py` を差し替える（インターフェースは `inject_prompt` のみ） |
 | VS Codeが最大化されない | `code` CLIには最大化オプションが無いため、起動後にWin32 APIで明示的に最大化している（`cline.maximize_window`）。pywinauto/windllの無い環境では失敗し、前回のウィンドウサイズを引き継ぐ |
+| VS Code起動時に「このフォルダを信頼しますか」ダイアログが出てClineに投入できない | worktreeは毎回新規フォルダのため、VS Codeが信頼確認ダイアログを出しClineの入力欄を塞ぐことがある。`launch_vscode()` は `--disable-workspace-trust` を付けて起動し、このダイアログ自体を出さないようにしている |
+| 承認・却下・再実装の詳細をTeamsの元スレッドにも残したい | `agent_core/teams.py` の `notify_decision()` を使うと、実装内容・確認した内容・未実施の確認・修正指示を、元の依頼スレッドへ返信として残せる |
+| 再実装（rework）でPRの本文が初回のまま古い | `finish_agent`/`implement_agent` は既存PRを再利用する際、`ghcli.update_pull_request_body()` で本文を最新の実装内容に上書きする |
+| 承認・却下・再実装の結果をGitHub Issue側にも記録として残したい | `approval_agent.py` は承認結果ファイルを処理する際、Teamsへの返信（`notify_decision`）に加えて、同じ内容を `ghcli.comment_issue()` でIssueコメントとしても投稿する。Teamsのスレッドが流れても、GitHub側に恒久的な記録が残る |
+| プレビュー公開後、ファイル移動をしたIssueでURLが404になる | `changed_files` に移動元（削除済み）のパスも含まれる場合、そちらを`index.html`候補として誤って選んでしまうことがあった。`build_preview_url()` に実在確認（`preview_root`/`worktree`基準）を追加し、実際に配置されているファイルだけを候補にするよう修正済み |
 | 承認者を限定する | Power Automate ③ のカードを承認者へのメンション付きにし、`data` に承認者名を含める |
 
 ## 7. 自動テスト

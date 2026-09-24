@@ -104,6 +104,7 @@ ai-agent-system/
 │   ├── deploy_preview.py     ④tools-betaへプレビュー公開
 │   ├── approval_agent.py     ⑤approval監視 → 振り分け
 │   ├── finish_agent.py       ⑥マージ・Issueクローズ
+│   ├── dashboard_agent.py     補助: Issue状態ダッシュボード（tools-betaへ公開）
 │   ├── agent_cli.py          運用コマンド
 │   ├── tests/                自動テスト（pytest、133件）
 │   ├── requirements.txt

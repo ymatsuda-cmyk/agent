@@ -25,7 +25,16 @@ AGENT_DIR = pathlib.Path(__file__).resolve().parent.parent
 if str(AGENT_DIR) not in sys.path:
     sys.path.insert(0, str(AGENT_DIR))
 
-from agent_core.config import CONFIG  # noqa: E402
+from agent_core.config import CONFIG, STATE_FOLDERS  # noqa: E402
+
+# STATE_FOLDERSの各フォルダは、CONFIG内で個別に環境変数上書きできる
+# （例: AGENT_STATE_DIR）。この上書きは AGENT_ROOT を無視して優先されるため、
+# もし実行環境（Windowsのユーザー環境変数など）にこれらが実際に設定されて
+# いると、AGENT_ROOT をどれだけテスト用に差し替えても、該当フォルダだけは
+# 本番の場所を指し続けてしまう。実際にこれが原因で、pytest実行時に
+# 本番のOneDrive上の state/ を直接汚染する事故が起きたため、
+# テストでは常にこれらを明示的に未設定へ倒す。
+_PER_FOLDER_OVERRIDE_KEYS = tuple(STATE_FOLDERS.values())
 
 
 def run_git(args: list[str], cwd: pathlib.Path) -> subprocess.CompletedProcess:
@@ -52,6 +61,13 @@ def agent_env(tmp_path, monkeypatch):
     unique = uuid.uuid4().hex[:8]
     agent_root = tmp_path / f"agent-root-{unique}"
     repo_dir = tmp_path / f"repo-{unique}"
+
+    # AGENT_ROOTの再設定より前に、フォルダ別の個別上書きを必ず消す。
+    # これを怠ると、実行環境に例えば AGENT_STATE_DIR が実在した場合、
+    # AGENT_ROOTをどれだけ差し替えても state/ だけは本番の場所を
+    # 指し続けてしまう（実際にこの経路で本番データが汚染された）。
+    for override_key in _PER_FOLDER_OVERRIDE_KEYS:
+        monkeypatch.delenv(override_key, raising=False)
 
     monkeypatch.setenv("GITHUB_TOKEN", "dummy-token-for-tests")
     monkeypatch.setenv("GITHUB_OWNER", "test-owner")

@@ -292,6 +292,18 @@ powershell -ExecutionPolicy Bypass -File .\scripts\setup.ps1 `
 <td>Cline入力欄のY座標</td>
 </tr>
 <tr>
+<td><code>AGENT_CLINE_TAB_X</code></td>
+<td></td>
+<td><code>1240</code></td>
+<td>Clineタブの座標（他の拡張とタブ共有時のみ使用）</td>
+</tr>
+<tr>
+<td><code>AGENT_CLINE_TAB_Y</code></td>
+<td></td>
+<td><code>50</code></td>
+<td>同上。<code>0</code>（既定）ならタブクリックをスキップする</td>
+</tr>
+<tr>
 <td><code>AGENT_IMPLEMENTATION_TIMEOUT</code></td>
 <td></td>
 <td><code>1800</code></td>
@@ -321,6 +333,13 @@ Clineのチャット入力欄の座標を教える必要があります。</p>
 <p>5秒後に指定座標をクリックして文字を打ちます。
 入力欄に入らない場合は、Windowsの「拡大縮小」が100%か確認し、
 <code>AGENT_CLINE_INPUT_X</code> / <code>AGENT_CLINE_INPUT_Y</code> を調整してください。</p>
+<p><strong>Claude Codeなど、他の拡張機能とサイドバーのタブを共有している場合</strong>、
+VS Code起動直後はCline以外のタブがアクティブなことがあり、
+入力欄をクリックしても実際にはCline以外の場所に貼り付けてしまいます。
+その場合は <code>AGENT_CLINE_TAB_X</code> / <code>AGENT_CLINE_TAB_Y</code> に、
+Clineタブ自体の座標を設定してください。入力欄をクリックする前に、
+自動でこのタブへ切り替えるようになります。未設定（既定値<code>0</code>）の場合は
+タブ切り替えを行いません。</p>
 <blockquote>
 <p>座標指定が安定しない環境では <code>AGENT_GUI_MODE=manual</code> を推奨します。
 Ctrl+V → Enter の2操作だけ人が行う運用になり、並走も問題なく動きます。</p>

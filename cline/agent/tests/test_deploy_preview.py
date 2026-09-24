@@ -111,6 +111,24 @@ def test_build_preview_url_skips_index_missing_from_preview(tmp_path):
     assert url.endswith("/issue-18/shop/")
 
 
+def test_deploy_url_skips_moved_away_index_end_to_end(full_repo_env):
+    """
+    ファイル移動のIssue（例: beta/clipstock を clipstock へ移動）で、
+    changed_files に移動元(削除された)パスも含まれる場合、
+    deploy() が実際に配置されたファイルだけを候補にしてURLを組み立てること。
+    deploy_preview.py側の編集ミスで、この preview_root の受け渡しが
+    壊れていた実例があったための回帰テスト。
+    """
+    worktree = _make_worktree(full_repo_env, 19)
+    (worktree / "shop").mkdir()
+    (worktree / "shop" / "index.html").write_text("<p>new location</p>", encoding="utf-8")
+    # "old/index.html" は worktree上に存在しない(移動元・削除済み)想定
+
+    result = dp.deploy(19, worktree, ["old/index.html", "shop/index.html"])
+
+    assert result["previewUrl"].endswith("/issue-19/shop/")
+
+
 def test_deploy_full_flow_pushes_to_beta_repo(full_repo_env):
     worktree = _make_worktree(full_repo_env, 19)
     (worktree / "shop").mkdir()

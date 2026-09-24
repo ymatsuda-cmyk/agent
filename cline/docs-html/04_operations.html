@@ -132,6 +132,49 @@ python agent\agent_cli.py clean-worktrees --remove-completed
 回答待ちのIssueはGUIを占有しないので、並走の効果はそこで出ます。</p>
 <p>VS Codeウィンドウが増えて操作しづらい場合は、
 <code>--no-vscode</code> で起動し、必要なときだけ人がworktreeを開く運用もできます。</p>
+<h2 id="25-issue状態ダッシュボード外出先からも確認したい場合">2.5 Issue状態ダッシュボード（外出先からも確認したい場合）</h2>
+<p>並走数が増えると、<code>agent_cli.py status</code> のテキスト出力だけでは
+「今どのIssueがどこで詰まっているか」を把握しづらくなります。
+<code>dashboard_agent.py</code> は、<code>state/</code> の変化を検知するたびに
+Issueの生データをJSONとして <code>tools-beta</code>（GitHub Pages）へ
+自動でpushし続けます。表示側は静的なHTML/JSアプリで、起動時と
+30秒ごとにこのJSONを取得してブラウザ側でカンバン表示を組み立てます。</p>
+<pre><code class="language-powershell"># 単体で起動する場合
+python agent\dashboard_agent.py
+
+# start_all.ps1 と同時に起動する場合
+powershell -ExecutionPolicy Bypass -File .\scripts\start_all.ps1 -Parallel 3 -Dashboard
+</code></pre>
+<p>公開先はプレビューと同じ <code>tools-beta</code> の別ディレクトリです。
+既存の <code>data/minutes/index.json</code> と同じ「<code>data/&lt;用途&gt;/</code>にJSONを置く」
+という、このリポジトリ自体の慣習に合わせています。</p>
+<pre><code>データ: tools-beta の data/agent/dashboard.json（更新のたびにpush）
+表示  : tools-beta の utility/agent.html（初回のみ作成。以降は固定）
+URL   : https://&lt;owner&gt;.github.io/tools-beta/utility/agent.html
+</code></pre>
+<p>この分離により、<strong>HTML自体はほぼ動かず、以降のpushはJSONの差分だけ</strong>
+になります。<code>utility/agent.html</code> を見た目やレイアウトの都合で
+手直ししても、次回以降のダッシュボード更新で上書きされません
+（<code>ensure_agent_html()</code> は既にあるファイルを上書きしない設計です）。</p>
+<p>このURLをスマホでブックマークしておけば、外出先や携帯回線からでも
+確認できます。ページはJavaScriptが30秒ごとにJSONを再取得して
+表示を更新するので、ページ全体の再読み込み（ちらつき）は起きません。</p>
+<p><strong>注意点</strong></p>
+<ul>
+<li><code>tools-beta</code> がGitHub上で公開リポジトリの場合、<strong>このURLを知っていれば
+  誰でもIssueのタイトルや状態を閲覧できます</strong>（既存のプレビューURLと
+  同じ公開範囲です）。社外に見せたくない情報が含まれる場合は、
+  <code>tools-beta</code> を非公開にするか、このスクリプト自体を使わない運用に
+  してください。</li>
+<li>反映には数十秒〜1、2分のタイムラグがあります（更新間隔30秒 ＋
+  GitHub Pagesのビルド時間）。厳密なリアルタイム性が必要な確認には
+  <code>agent_cli.py status</code> を直接使ってください。</li>
+<li><code>deploy_preview.py</code> と同じ <code>tools-beta</code> クローン・同じロックを
+  使うため、プレビュー公開中でも安全に共存します。</li>
+<li>承認待ち（<code>waiting_approval</code>）が2時間、質問回答待ち
+  （<code>waiting_decision</code>）が1時間を超えると、カードに「⚠ 放置」と
+  表示されます。</li>
+</ul>
 <h2 id="3-よくあるトラブル">3. よくあるトラブル</h2>
 <h3 id="request-question-state-などのフォルダが意図しない場所リポジトリ直下などにできている"><code>request</code> <code>question</code> <code>state</code> などのフォルダが、意図しない場所（リポジトリ直下など）にできている</h3>
 <p><strong>症状</strong>: <code>AGENT_ROOT</code>（OneDrive上のはず）ではなく、
@@ -209,25 +252,31 @@ $content = Get-Content .\scripts\setup.ps1 -Raw -Encoding UTF8
     (New-Object System.Text.UTF8Encoding($true))
 )
 </code></pre>
-<h3 id="pytest-で無関係なテストが失敗する前のテストのissueが残っている"><code>pytest</code> で無関係なテストが失敗する（前のテストのIssueが残っている）</h3>
-<p><code>test_statefile.py</code> や <code>test_gitops.py</code> で、作った覚えのないIssue番号が
-状態に混ざっている・想定より多いテストが失敗する場合、テスト間の
-隔離が壊れています。まず次を実行し、どちらで失敗するか確認してください。</p>
-<pre><code class="language-powershell">pytest agent\tests\test_isolation_diagnostic.py -v
+<h3 id="pytest-を実行すると本番のonedrive上にテストのissueが混入する原因確定修正済み"><code>pytest</code> を実行すると、本番のOneDrive上にテストのIssueが混入する（原因確定・修正済み）</h3>
+<p><strong>症状</strong>: <code>agent_cli.py status</code> や生成されたダッシュボードに、
+タイトルが <code>"t"</code> や <code>"却下されたIssue"</code> など、実際に依頼した覚えのない
+Issueが表示される。</p>
+<p><strong>原因</strong>: <code>Config</code> は <code>state</code> フォルダ等を個別に上書きできる
+（<code>AGENT_STATE_DIR</code> 等、<code>docs/02_setup.md</code> 参照）。この上書きは
+<code>AGENT_ROOT</code> より優先される。もし実行環境（Windowsのユーザー環境変数）に
+<code>AGENT_STATE_DIR</code> が過去の設定作業などで実際に残っていると、
+テストが <code>AGENT_ROOT</code> をどれだけ一時フォルダへ差し替えても、
+<strong><code>state</code> フォルダだけは常に本番のOneDriveを指し続ける。</strong>
+テストのフィクスチャは以前 <code>AGENT_ROOT</code> 等の主要な変数しか
+上書きしておらず、この個別上書きキーには無防備だった。</p>
+<p><strong>対策（修正済み）</strong>: <code>agent/tests/conftest.py</code> の <code>agent_env</code>
+フィクスチャは、<code>AGENT_ROOT</code> を設定する前に、<code>STATE_FOLDERS</code> の
+個別上書きキー（<code>AGENT_REQUEST_DIR</code> <code>AGENT_STATE_DIR</code> 等）を
+すべて明示的に削除するようにした。実行環境にこれらが実在していても、
+テスト中は無視される。</p>
+<p><strong>もし既にこの経路で本番stateが汚染されている場合</strong>:</p>
+<pre><code class="language-powershell">Get-ChildItem Env: | Where-Object { $_.Name -like 'AGENT_*' }
 </code></pre>
-<ul>
-<li><strong>2件とも通る</strong> → 単体では正しく隔離されている。他のテストファイルとの
-  組み合わせでのみ再現する可能性が高いので、<code>pytest agent -v</code> の完全な
-  出力をそのまま報告してください。</li>
-<li><strong><code>test_isolation_diagnostic_second</code> が失敗する</strong> → <code>agent_env</code>
-  フィクスチャ自体の隔離が機能していません。表示される
-  <code>AssertionError</code> のメッセージ全文（<code>CONFIG.agent_root</code> の期待値・実際値、
-  または既存Issueファイルの一覧）をそのまま報告してください。
-  原因を特定して修正します。</li>
-</ul>
-<p>これはWindows特有の環境要因（アンチウイルス、OneDrive同期、
-pytestやPythonのバージョンの組み合わせなど）が疑われますが、
-Linux環境では再現しておらず未特定です。</p>
+<p><code>AGENT_STATE_DIR</code> 等が実際に設定されていたら削除する
+（<code>[Environment]::SetEnvironmentVariable("AGENT_STATE_DIR", $null, "User")</code>）。
+そのうえで、<code>state/</code> に紛れ込んだテスト由来のIssue
+（タイトルが <code>"t"</code> 等、明らかにテストコードのものだと分かるもの）を
+個別に削除する。</p>
 <h3 id="issueが二重に作られる">Issueが二重に作られる</h3>
 <ul>
 <li>①のTeams投稿JSONに <code>id</code>（Message ID）が入っているか確認する</li>
@@ -283,6 +332,23 @@ python agent\agent_cli.py approve 12
 <p>Cline側の再発防止としては、プロンプトの
 「ファイルはUTF-8 BOMなしで保存してください」を守らせることと、
 VS Codeの <code>files.encoding</code> を <code>utf8</code> にしておくことです。</p>
+<h3 id="静的チェック不合格failedからteamsを介さず修正を指示したい">静的チェック不合格（<code>failed</code>）から、Teamsを介さず修正を指示したい</h3>
+<p><code>check_static()</code>（HTMLタグ対応・リンク切れ）で <code>failed</code> になったIssueは、
+承認カードが既に消費済みで「再実装」ボタンが使えない。
+<code>agent_cli.py rework</code> は、承認カードの「再実装」ボタンと<strong>全く同じ処理</strong>
+（<code>approval_agent.handle_rework</code>）を直接呼び出すコマンドで、承認カード無しに
+同じブランチ・同じworktreeでClineへ修正指示を出せる。</p>
+<pre><code class="language-powershell">python agent\agent_cli.py rework 77 &quot;clipstock/index.htmlのHTMLタグの対応が壊れています。閉じタグに対応する開始タグが7箇所見つかりませんでした。修正してください。修正が終わったら教えてください。&quot;
+</code></pre>
+<p><code>status</code> が <code>rework</code> に戻り、常駐している <code>orchestrator</code> が拾って
+自動的に再開する。常駐していなければ次で単体実行できる。</p>
+<pre><code class="language-powershell">python agent\orchestrator.py --once --min-issue 77 --max-issue 77
+</code></pre>
+<p><strong>Teamsに自由なテキストを打ち込んで、それを特定のIssueへの追加指示として
+自動で拾う経路は、現時点では無い。</strong> 依頼チャネルへの新規投稿は別のIssueを
+作るだけで、既存のworktree/ブランチは再利用されない。この用途で
+Teams発の自由入力を使えるようにするには、別途Power Automateフローの
+追加が必要（<code>rework</code>と同じ状態遷移をトリガーする新しいフロー）。</p>
 <h2 id="4-障害時の復旧">4. 障害時の復旧</h2>
 <p>プロセスが落ちても、<code>state/issue-&lt;N&gt;.json</code> に状態が残っています。</p>
 <table>
@@ -441,6 +507,26 @@ python agent\agent_cli.py retry 12
 <tr>
 <td>VS Codeが最大化されない</td>
 <td><code>code</code> CLIには最大化オプションが無いため、起動後にWin32 APIで明示的に最大化している（<code>cline.maximize_window</code>）。pywinauto/windllの無い環境では失敗し、前回のウィンドウサイズを引き継ぐ</td>
+</tr>
+<tr>
+<td>VS Code起動時に「このフォルダを信頼しますか」ダイアログが出てClineに投入できない</td>
+<td>worktreeは毎回新規フォルダのため、VS Codeが信頼確認ダイアログを出しClineの入力欄を塞ぐことがある。<code>launch_vscode()</code> は <code>--disable-workspace-trust</code> を付けて起動し、このダイアログ自体を出さないようにしている</td>
+</tr>
+<tr>
+<td>承認・却下・再実装の詳細をTeamsの元スレッドにも残したい</td>
+<td><code>agent_core/teams.py</code> の <code>notify_decision()</code> を使うと、実装内容・確認した内容・未実施の確認・修正指示を、元の依頼スレッドへ返信として残せる</td>
+</tr>
+<tr>
+<td>再実装（rework）でPRの本文が初回のまま古い</td>
+<td><code>finish_agent</code>/<code>implement_agent</code> は既存PRを再利用する際、<code>ghcli.update_pull_request_body()</code> で本文を最新の実装内容に上書きする</td>
+</tr>
+<tr>
+<td>承認・却下・再実装の結果をGitHub Issue側にも記録として残したい</td>
+<td><code>approval_agent.py</code> は承認結果ファイルを処理する際、Teamsへの返信（<code>notify_decision</code>）に加えて、同じ内容を <code>ghcli.comment_issue()</code> でIssueコメントとしても投稿する。Teamsのスレッドが流れても、GitHub側に恒久的な記録が残る</td>
+</tr>
+<tr>
+<td>プレビュー公開後、ファイル移動をしたIssueでURLが404になる</td>
+<td><code>changed_files</code> に移動元（削除済み）のパスも含まれる場合、そちらを<code>index.html</code>候補として誤って選んでしまうことがあった。<code>build_preview_url()</code> に実在確認（<code>preview_root</code>/<code>worktree</code>基準）を追加し、実際に配置されているファイルだけを候補にするよう修正済み</td>
 </tr>
 <tr>
 <td>承認者を限定する</td>
